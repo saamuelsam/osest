@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -46,7 +46,7 @@ const LoginPage = () => {
     try {
       await login(email, password);
       toast({
-        title: 'Login realizado com sucesso',
+        title: 'Login realizado com sucesso!',
         status: 'success',
         duration: 3000,
         isClosable: true,
