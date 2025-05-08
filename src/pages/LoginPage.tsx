@@ -54,7 +54,7 @@ const LoginPage = () => {
       navigate('/dashboard');
     } catch (error) {
       toast({
-        title: 'Erro ao fazer login',
+        title: 'Erro ao fazer login!',
         description: 'Email ou senha incorretos.',
         status: 'error',
         duration: 3000,
