@@ -9,6 +9,7 @@ import UsersPage from './pages/UsersPage';
 import NotFoundPage from './pages/NotFoundPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   const { isAuthenticated, loading, checkAuth } = useAuth();
@@ -31,6 +32,8 @@ function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/materials" element={<MaterialsPage />} />
           <Route path="/users" element={<UsersPage />} />
+          {/* Adicione as novas rotas aqui */}
+          <Route path="/perfil" element={<ProfilePage />} />
         </Route>
       </Route>
       

@@ -9,10 +9,11 @@ import {
   MenuItem,
   Avatar,
   Box,
-  IconButton,
+  // IconButton, // IconButton não está sendo usado, pode remover se não for necessário
 } from '@chakra-ui/react';
 import { LogOut, User, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom'; // 1. IMPORTE useNavigate
 
 interface NavbarProps {
   menuButton?: ReactNode;
@@ -20,6 +21,16 @@ interface NavbarProps {
 
 const Navbar = ({ menuButton }: NavbarProps) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate(); // 2. CHAME useNavigate para obter a função de navegação
+
+  // 3. CRIE OS HANDLERS (ou chame navigate diretamente no onClick)
+  const handleProfileClick = () => {
+    navigate('/perfil');
+  };
+
+  const handleSettingsClick = () => {
+    navigate('/configuracoes');
+  };
 
   return (
     <Flex
@@ -54,8 +65,13 @@ const Navbar = ({ menuButton }: NavbarProps) => {
           </HStack>
         </MenuButton>
         <MenuList>
-          <MenuItem icon={<User size={18} />}>Perfil</MenuItem>
-          <MenuItem icon={<Settings size={18} />}>Configurações</MenuItem>
+          {/* 4. ADICIONE os onClick handlers */}
+          <MenuItem icon={<User size={18} />} onClick={handleProfileClick}>
+            Perfil
+          </MenuItem>
+          <MenuItem icon={<Settings size={18} />} onClick={handleSettingsClick}>
+            Configurações
+          </MenuItem>
           <MenuItem icon={<LogOut size={18} />} onClick={logout}>
             Sair
           </MenuItem>
