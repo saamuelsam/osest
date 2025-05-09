@@ -50,11 +50,9 @@ const DashboardPage = () => {
     fetchData();
   }, []);
 
-  // Filter low stock items
   const lowStockProducts = products.filter(product => product.quantity < product.minQuantity);
   const lowStockMaterials = materials.filter(material => material.quantity < material.minQuantity);
 
-  // Calculate total quantities
   const totalProducts = products.length;
   const totalMaterials = materials.length;
   const totalLowStock = lowStockProducts.length + lowStockMaterials.length;
@@ -68,10 +66,12 @@ const DashboardPage = () => {
   }
 
   return (
-    <Box>
-      <Heading size="lg" mb={6}>Dashboard</Heading>
+    <Box p={{ base: 4, md: 6 }} overflowX="hidden"> {/* Add overflowX hidden to the main container as a safeguard if needed, but ideally fix the child */}
+      <Heading size={{ base: 'lg', md: 'xl' }} mb={{ base: 4, md: 6 }}>
+        Dashboard
+      </Heading>
       
-      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 4, md: 6 }} mb={{ base: 6, md: 8 }}>
         <StatCard
           title="Total de Produtos"
           value={totalProducts}
@@ -95,34 +95,39 @@ const DashboardPage = () => {
 
       {totalLowStock > 0 && (
         <Box>
-          <Heading size="md" mb={4}>Itens em Baixo Estoque</Heading>
+          <Heading size={{ base: 'md', md: 'lg' }} mb={{ base: 3, md: 4 }}>
+            Itens em Baixo Estoque
+          </Heading>
           
           {lowStockProducts.length > 0 && (
-            <Box mb={6}>
+            <Box mb={{ base: 4, md: 6 }}>
               <Flex align="center" mb={2}>
                 <Icon as={Package} mr={2} color="brand.primary" />
-                <Text fontWeight="medium">Produtos</Text>
+                <Text fontWeight="medium" fontSize={{ base: 'md', md: 'lg' }}>Produtos</Text>
               </Flex>
-              <TableContainer bg="white" rounded="md" shadow="sm">
-                <Table variant="simple" size="sm">
+              {/* Ensure TableContainer can scroll its content and doesn't grow indefinitely */}
+              <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto" maxW="100%">
+                <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
                   <Thead>
                     <Tr>
-                      <Th>Nome</Th>
-                      <Th>Categoria</Th>
+                      {/* Apply whiteSpace normal to allow wrapping if needed, though Th usually handles this */}
+                      <Th whiteSpace="normal">Nome</Th>
+                      <Th display={{ base: 'none', sm: 'table-cell' }} whiteSpace="normal">Categoria</Th>
                       <Th isNumeric>Atual</Th>
                       <Th isNumeric>Mínimo</Th>
-                      <Th>Status</Th>
+                      <Th whiteSpace="normal">Status</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
                     {lowStockProducts.map((product) => (
                       <Tr key={product.id}>
-                        <Td fontWeight="medium">{product.name}</Td>
-                        <Td>{product.category}</Td>
+                        {/* For long text in cells, ensure it can break */}
+                        <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{product.name}</Td>
+                        <Td display={{ base: 'none', sm: 'table-cell' }} whiteSpace="normal" wordBreak="break-word">{product.category}</Td>
                         <Td isNumeric>{product.quantity}</Td>
                         <Td isNumeric>{product.minQuantity}</Td>
                         <Td>
-                          <Badge colorScheme={product.quantity === 0 ? "red" : "orange"}>
+                          <Badge fontSize={{ base: 'xs', md: 'sm' }} colorScheme={product.quantity === 0 ? "red" : "orange"}>
                             {product.quantity === 0 ? "Em falta" : "Baixo estoque"}
                           </Badge>
                         </Td>
@@ -138,26 +143,26 @@ const DashboardPage = () => {
             <Box>
               <Flex align="center" mb={2}>
                 <Icon as={ShoppingBag} mr={2} color="brand.accent" />
-                <Text fontWeight="medium">Materiais</Text>
+                <Text fontWeight="medium" fontSize={{ base: 'md', md: 'lg' }}>Materiais</Text>
               </Flex>
-              <TableContainer bg="white" rounded="md" shadow="sm">
-                <Table variant="simple" size="sm">
+              <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto" maxW="100%">
+                <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
                   <Thead>
                     <Tr>
-                      <Th>Nome</Th>
+                      <Th whiteSpace="normal">Nome</Th>
                       <Th isNumeric>Atual</Th>
                       <Th isNumeric>Mínimo</Th>
-                      <Th>Status</Th>
+                      <Th whiteSpace="normal">Status</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
                     {lowStockMaterials.map((material) => (
                       <Tr key={material.id}>
-                        <Td fontWeight="medium">{material.name}</Td>
+                        <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{material.name}</Td>
                         <Td isNumeric>{material.quantity}</Td>
                         <Td isNumeric>{material.minQuantity}</Td>
                         <Td>
-                          <Badge colorScheme={material.quantity === 0 ? "red" : "orange"}>
+                          <Badge fontSize={{ base: 'xs', md: 'sm' }} colorScheme={material.quantity === 0 ? "red" : "orange"}>
                             {material.quantity === 0 ? "Em falta" : "Baixo estoque"}
                           </Badge>
                         </Td>
@@ -174,6 +179,7 @@ const DashboardPage = () => {
   );
 };
 
+// ... StatCard component remains the same ...
 interface StatCardProps {
   title: string;
   value: number;
@@ -185,8 +191,8 @@ interface StatCardProps {
 const StatCard = ({ title, value, helpText, icon, accentColor }: StatCardProps) => {
   return (
     <Stat
-      px={4}
-      py={5}
+      px={{ base: 3, md: 4 }} // Padding responsivo
+      py={{ base: 4, md: 5 }} // Padding responsivo
       bg="white"
       rounded="lg"
       shadow="sm"
@@ -195,26 +201,26 @@ const StatCard = ({ title, value, helpText, icon, accentColor }: StatCardProps) 
       transition="transform 0.2s"
       _hover={{ transform: 'translateY(-2px)', shadow: 'md' }}
     >
-      <Flex justifyContent="space-between">
+      <Flex justifyContent="space-between" alignItems="center">
         <Box>
-          <StatLabel fontSize="sm" fontWeight="medium" isTruncated>
+          <StatLabel fontSize={{ base: 'xs', md: 'sm' }} fontWeight="medium" isTruncated>
             {title}
           </StatLabel>
-          <StatNumber fontSize="3xl" fontWeight="bold">
+          <StatNumber fontSize={{ base: '2xl', md: '3xl' }} fontWeight="bold">
             {value}
           </StatNumber>
           {helpText && (
-            <StatHelpText mb={0} color="gray.500">
+            <StatHelpText mb={0} color="gray.500" fontSize={{ base: 'xs', md: 'sm' }}>
               {helpText}
             </StatHelpText>
           )}
         </Box>
         <Box
-          p={2}
+          p={{ base: 1, md: 2 }} // Padding responsivo
           bg={accentColor}
           color="white"
           rounded="md"
-          alignSelf="flex-start"
+          alignSelf="flex-start" 
         >
           {icon}
         </Box>

@@ -1,55 +1,50 @@
+dotenv.config();                // 1) Carrega .env antes de qualquer outra coisa
+import dotenv from 'dotenv';
+
+import './src/database/db.js';      // 2) Inicializa a conexão MySQL
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import userRoutes from '../backend/src/routes/userRoutes.js';
-import authRoutes from '../backend/src/routes/authRoutes.js';
-import productRoutes from '../backend/src/routes/productRoutes.js';
-import materialRoutes from '../backend/src/routes/materialRoutes.js';
-import { notFound, errorHandler } from '../backend/src/middleware/errorMiddleware.js';
 
-// Load environment variables
-dotenv.config();
+import authRoutes from './src/routes/authRoutes.js';
+import userRoutes from './src/routes/userRoutes.js';
+import productRoutes from './src/routes/productRoutes.js';
+import materialRoutes from './src/routes/materialRoutes.js';
+import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 
-// Fix __dirname in ES modules
+// Corrige __dirname em ES Modules
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname  = path.dirname(__filename);
 
-// Initialize Express
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+// ROTAS
+app.use('/api/auth',     authRoutes);
+app.use('/api/users',    userRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/materials', materialRoutes);
+app.use('/api/materials',materialRoutes);
 
-// Serve static frontend in production
+// Serve o frontend em produção
 if (process.env.NODE_ENV === 'production') {
-  const frontendBuildPath = path.resolve(__dirname, '../../dist');
-  app.use(express.static(frontendBuildPath));
-  
+  const buildPath = path.resolve(__dirname, '../../dist');
+  app.use(express.static(buildPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve(frontendBuildPath, 'index.html'));
+    res.sendFile(path.resolve(buildPath, 'index.html'));
   });
 } else {
-  app.get('/', (req, res) => {
-    res.send('API is running...');
-  });
+  app.get('/', (req, res) => res.send('API is running...'));
 }
 
-// Error handling middleware
+// Middleware de erro
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

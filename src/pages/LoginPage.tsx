@@ -55,7 +55,8 @@ const LoginPage = () => {
     } catch (error) {
       toast({
         title: 'Erro ao fazer login!',
-        description: 'Email ou senha incorretos.',
+        // description: 'Email ou senha incorretos.', // Considerar mensagem de erro mais genérica ou específica da API
+        description: (error as Error)?.message || 'Ocorreu um erro. Tente novamente.',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -66,24 +67,33 @@ const LoginPage = () => {
   };
 
   return (
-    <Flex minH="100vh" align="center" justify="center" bg="brand.background">
+    <Flex minH="100vh" align="center" justify="center" bg="brand.background" p={{ base: 4, sm: 6 }}> {/* Adicionado padding responsivo ao Flex container */}
       <Box
         bg="white"
-        p={8}
+        p={{ base: 6, sm: 8 }} // Padding responsivo para o Box do formulário
         rounded="md"
         shadow="lg"
-        w={{ base: '90%', sm: '400px' }}
+        w={{ base: '100%', sm: '450px', md: '500px' }} // Ajuste na largura, permitindo um pouco mais de espaço
+        maxW="500px" // Garante que não fique excessivamente largo em telas muito grandes
         borderTop="4px solid"
         borderColor="brand.primary"
       >
-        <VStack spacing={6} align="center" mb={6}>
-          <Flex alignItems="center">
+        <VStack spacing={{ base: 4, sm: 6 }} align="center" mb={{ base: 4, sm: 6 }}> {/* Spacing e margin bottom responsivos */}
+          <Flex alignItems="center" direction={{ base: 'column', sm: 'row' }}> {/* Direção responsiva para o logo e título */}
             <Leaf size={28} color="#336636" />
-            <Heading ml={2} size="lg" color="brand.primary">
+            <Heading 
+              ml={{ base: 0, sm: 2 }} 
+              mt={{ base: 2, sm: 0 }}
+              size={{ base: 'md', sm: 'lg' }} // Tamanho do Heading responsivo
+              color="brand.primary"
+              textAlign={{ base: 'center', sm: 'left' }}
+            >
               Orgânicos da Fátima
             </Heading>
           </Flex>
-          <Text color="gray.600">Faça login para acessar o sistema</Text>
+          <Text color="gray.600" textAlign="center"> {/* Centraliza o texto de subtítulo */}
+            Faça login para acessar o sistema
+          </Text>
         </VStack>
 
         <form onSubmit={handleSubmit}>
@@ -96,12 +106,13 @@ const LoginPage = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Seu email"
                 focusBorderColor="brand.primary"
+                size={{ base: 'md', sm: 'lg' }} // Tamanho do input responsivo
               />
             </FormControl>
 
             <FormControl id="password">
               <FormLabel>Senha</FormLabel>
-              <InputGroup>
+              <InputGroup size={{ base: 'md', sm: 'lg' }}> {/* Tamanho do InputGroup responsivo */}
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -115,7 +126,7 @@ const LoginPage = () => {
                     icon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     variant="ghost"
                     onClick={() => setShowPassword(!showPassword)}
-                    size="sm"
+                    size="sm" // Mantém o tamanho do ícone consistente
                   />
                 </InputRightElement>
               </InputGroup>
@@ -125,7 +136,7 @@ const LoginPage = () => {
               type="submit"
               colorScheme="green"
               bg="brand.primary"
-              size="lg"
+              size={{ base: 'md', sm: 'lg' }} // Tamanho do botão responsivo
               w="full"
               mt={4}
               isLoading={loading}

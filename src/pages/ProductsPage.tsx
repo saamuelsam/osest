@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  Stack, // Adicionado para empilhamento responsivo de botões de ação
 } from '@chakra-ui/react';
 import { Edit, Trash2, Plus, Search, RefreshCw } from 'lucide-react';
 import api from '../services/api';
@@ -66,7 +67,6 @@ const ProductsPage = () => {
       const response = await api.get('/products');
       setProducts(response.data);
       
-      // Extract unique categories
       const uniqueCategories = Array.from(
         new Set(response.data.map((product: Product) => product.category))
       );
@@ -150,10 +150,8 @@ const ProductsPage = () => {
 
   const handleProductSaved = (savedProduct: Product) => {
     if (selectedProduct) {
-      // Update existing product
       setProducts(products.map(p => p.id === savedProduct.id ? savedProduct : p));
     } else {
-      // Add new product
       setProducts([...products, savedProduct]);
     }
     onProductModalClose();
@@ -170,33 +168,42 @@ const ProductsPage = () => {
   };
 
   return (
-    <Box>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg">Gerenciar Produtos</Heading>
+    <Box p={{ base: 4, md: 6 }}> {/* Padding responsivo */}
+      <Flex 
+        direction={{ base: 'column', sm: 'row' }} // Empilha em telas muito pequenas
+        justify="space-between" 
+        align={{ base: 'flex-start', sm: 'center' }} // Alinhamento responsivo
+        mb={6}
+        gap={4} // Espaçamento entre título e botão quando empilhados
+      >
+        <Heading size={{ base: 'md', md: 'lg' }}>Gerenciar Produtos</Heading> {/* Tamanho do título responsivo */}
         <Button 
           leftIcon={<Plus size={18} />} 
           colorScheme="green" 
           bg="brand.primary"
           onClick={handleAddProduct}
           _hover={{ bg: 'brand.primary', opacity: 0.9 }}
+          w={{ base: 'full', sm: 'auto' }} // Botão ocupa largura total em telas pequenas
+          size={{ base: 'md', md: 'md' }}
         >
           Novo Produto
         </Button>
       </Flex>
       
-      <Box bg="white" p={4} rounded="md" shadow="sm" mb={6}>
+      <Box bg="white" p={{ base: 3, md: 4 }} rounded="md" shadow="sm" mb={6}> {/* Padding responsivo */}
         <Flex 
-          direction={{ base: 'column', md: 'row' }} 
+          direction={{ base: 'column', lg: 'row' }} // Empilha até 'lg'
           gap={4} 
-          align={{ base: 'stretch', md: 'center' }}
+          align={{ base: 'stretch', lg: 'center' }}
         >
-          <Box flex="1">
+          <Box flex={{ base: 'none', lg: '1' }} w={{ base: '100%', lg: 'auto' }}> {/* Input de busca ocupa mais espaço */}
             <Flex>
               <Input
                 placeholder="Buscar produtos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 focusBorderColor="brand.primary"
+                size={{ base: 'sm', md: 'md' }}
               />
               <IconButton
                 aria-label="Buscar"
@@ -204,16 +211,18 @@ const ProductsPage = () => {
                 ml={2}
                 colorScheme="green"
                 variant="outline"
+                size={{ base: 'sm', md: 'md' }}
               />
             </Flex>
           </Box>
           
-          <Box w={{ base: '100%', md: '200px' }}>
+          <Box w={{ base: '100%', md: '250px', lg: '200px' }}> {/* Largura do select responsiva */}
             <Select
               placeholder="Filtrar por categoria"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               focusBorderColor="brand.primary"
+              size={{ base: 'sm', md: 'md' }}
             >
               {categories.map(category => (
                 <option key={category} value={category}>
@@ -227,7 +236,8 @@ const ProductsPage = () => {
             leftIcon={<RefreshCw size={16} />}
             onClick={resetFilters}
             variant="ghost"
-            size="sm"
+            size={{ base: 'sm', md: 'md' }}
+            w={{ base: 'full', lg: 'auto' }} // Botão de limpar ocupa largura total em telas pequenas/médias quando empilhado
           >
             Limpar filtros
           </Button>
@@ -242,59 +252,64 @@ const ProductsPage = () => {
         <>
           {filteredProducts.length === 0 ? (
             <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
-              <Text>Nenhum produto encontrado.</Text>
+              <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum produto encontrado.</Text>
             </Box>
           ) : (
-            <TableContainer bg="white" rounded="md" shadow="sm">
-              <Table variant="simple">
+            <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto">
+              <Table variant="simple" size={{ base: 'sm', md: 'md' }}> {/* Tamanho da tabela responsivo */}
                 <Thead>
                   <Tr>
-                    <Th>Nome</Th>
-                    <Th>Categoria</Th>
-                    <Th isNumeric>Quantidade</Th>
-                    <Th isNumeric>Mínimo</Th>
-                    <Th>Status</Th>
-                    <Th>Ações</Th>
+                    <Th whiteSpace="normal">Nome</Th>
+                    <Th display={{ base: 'none', md: 'table-cell' }} whiteSpace="normal">Categoria</Th> {/* Oculta em telas menores que md */}
+                    <Th isNumeric>Qtd.</Th> {/* Abreviado para economizar espaço */}
+                    <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th> {/* Oculta em telas muito pequenas */}
+                    <Th whiteSpace="normal">Status</Th>
+                    <Th whiteSpace="normal">Ações</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
                   {filteredProducts.map((product) => (
                     <Tr key={product.id}>
-                      <Td fontWeight="medium">{product.name}</Td>
-                      <Td>{product.category}</Td>
+                      <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{product.name}</Td>
+                      <Td display={{ base: 'none', md: 'table-cell' }} whiteSpace="normal" wordBreak="break-word">{product.category}</Td>
                       <Td isNumeric>{product.quantity}</Td>
-                      <Td isNumeric>{product.minQuantity}</Td>
+                      <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{product.minQuantity}</Td>
                       <Td>
                         {product.quantity < product.minQuantity ? (
-                          <Badge colorScheme="red">Baixo estoque</Badge>
+                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="red">Baixo estoque</Badge>
                         ) : (
-                          <Badge colorScheme="green">Normal</Badge>
+                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="green">Normal</Badge>
                         )}
                       </Td>
                       <Td>
-                        <HStack spacing={2}>
+                        {/* Usar Stack para empilhar botões em telas pequenas, HStack para maiores */}
+                        <Stack 
+                          direction={{ base: 'column', lg: 'row' }} 
+                          spacing={{ base: 1, lg: 2 }} 
+                          alignItems="flex-start" // Para alinhar os botões à esquerda quando em coluna
+                        >
                           <IconButton
                             aria-label="Ajustar estoque"
                             icon={<RefreshCw size={16} />}
-                            size="sm"
+                            size="xs" // Tamanho menor para os botões de ação
                             colorScheme="blue"
                             onClick={() => handleStockAdjustment(product)}
                           />
                           <IconButton
                             aria-label="Editar produto"
                             icon={<Edit size={16} />}
-                            size="sm"
+                            size="xs"
                             colorScheme="green"
                             onClick={() => handleEditProduct(product)}
                           />
                           <IconButton
                             aria-label="Excluir produto"
                             icon={<Trash2 size={16} />}
-                            size="sm"
+                            size="xs"
                             colorScheme="red"
                             onClick={() => handleDeleteClick(product)}
                           />
-                        </HStack>
+                        </Stack>
                       </Td>
                     </Tr>
                   ))}
@@ -324,22 +339,23 @@ const ProductsPage = () => {
         isOpen={isDeleteDialogOpen}
         leastDestructiveRef={cancelRef}
         onClose={onDeleteDialogClose}
+        isCentered // Centraliza o modal
       >
         <AlertDialogOverlay>
-          <AlertDialogContent>
+          <AlertDialogContent mx={{ base: 4, md: 0 }}> {/* Adiciona margem horizontal em telas pequenas */}
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               Excluir produto
             </AlertDialogHeader>
 
-            <AlertDialogBody>
+            <AlertDialogBody fontSize={{ base: 'sm', md: 'md' }}> {/* Tamanho da fonte do corpo responsivo */}
               Tem certeza que deseja excluir o produto "{productToDelete?.name}"? Esta ação não pode ser desfeita.
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onDeleteDialogClose}>
+              <Button ref={cancelRef} onClick={onDeleteDialogClose} size={{ base: 'sm', md: 'md' }}>
                 Cancelar
               </Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3}>
+              <Button colorScheme="red" onClick={handleDelete} ml={3} size={{ base: 'sm', md: 'md' }}>
                 Excluir
               </Button>
             </AlertDialogFooter>

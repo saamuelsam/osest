@@ -17,7 +17,7 @@ import {
   Badge,
   IconButton,
   Input,
-  HStack,
+  HStack, // Manter se usado em algum lugar, mas para ações usaremos Stack
   Text,
   useToast,
   AlertDialog,
@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  Stack, // Adicionado para empilhamento responsivo
 } from '@chakra-ui/react';
 import { Edit, Trash2, Plus, Search, RefreshCw } from 'lucide-react';
 import api from '../services/api';
@@ -77,15 +78,14 @@ const MaterialsPage = () => {
   };
 
   const filterMaterials = () => {
-    if (!searchTerm) {
-      setFilteredMaterials(materials);
-      return;
+    // Corrigido: Aplicar filtro mesmo se searchTerm estiver vazio para resetar para todos os materiais
+    let result = [...materials];
+    if (searchTerm) {
+      result = materials.filter(material => 
+        material.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-    
-    const filtered = materials.filter(material => 
-      material.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredMaterials(filtered);
+    setFilteredMaterials(result);
   };
 
   const handleAddMaterial = () => {
@@ -137,10 +137,8 @@ const MaterialsPage = () => {
 
   const handleMaterialSaved = (savedMaterial: Material) => {
     if (selectedMaterial) {
-      // Update existing material
       setMaterials(materials.map(m => m.id === savedMaterial.id ? savedMaterial : m));
     } else {
-      // Add new material
       setMaterials([...materials, savedMaterial]);
     }
     onMaterialModalClose();
@@ -152,35 +150,45 @@ const MaterialsPage = () => {
   };
 
   return (
-    <Box>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg">Materiais de Uso Interno</Heading>
+    <Box p={{ base: 4, md: 6 }}> {/* Padding responsivo */}
+      <Flex 
+        direction={{ base: 'column', sm: 'row' }}
+        justify="space-between" 
+        align={{ base: 'flex-start', sm: 'center' }}
+        mb={6}
+        gap={4}
+      >
+        <Heading size={{ base: 'md', md: 'lg' }}>Materiais de Uso Interno</Heading>
         <Button 
           leftIcon={<Plus size={18} />} 
-          colorScheme="green" 
+          colorScheme="yellow" // Ajustado para melhor contraste com brand.accent se for amarelo/laranja
           bg="brand.accent"
-          color="gray.800"
+          color="gray.800" // Garantir contraste do texto do botão
           onClick={handleAddMaterial}
           _hover={{ bg: 'brand.accent', opacity: 0.9 }}
+          w={{ base: 'full', sm: 'auto' }}
+          size={{ base: 'md', md: 'md' }}
         >
           Novo Material
         </Button>
       </Flex>
       
-      <Box bg="white" p={4} rounded="md" shadow="sm" mb={6}>
+      <Box bg="white" p={{ base: 3, md: 4 }} rounded="md" shadow="sm" mb={6}>
         <Flex>
           <Input
             placeholder="Buscar materiais..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             focusBorderColor="brand.accent"
+            size={{ base: 'sm', md: 'md' }}
           />
           <IconButton
             aria-label="Buscar"
             icon={<Search size={18} />}
             ml={2}
-            colorScheme="green"
+            colorScheme="yellow" // Coerente com o botão de adicionar
             variant="outline"
+            size={{ base: 'sm', md: 'md' }}
           />
         </Flex>
       </Box>
@@ -191,59 +199,67 @@ const MaterialsPage = () => {
         </Center>
       ) : (
         <>
-          {filteredMaterials.length === 0 ? (
-            <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
-              <Text>Nenhum material encontrado.</Text>
-            </Box>
-          ) : (
-            <TableContainer bg="white" rounded="md" shadow="sm">
-              <Table variant="simple">
+          {filteredMaterials.length === 0 && !searchTerm ? ( // Mostrar apenas se não houver materiais e não houver busca
+             <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
+               <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum material cadastrado.</Text>
+             </Box>
+           ) : filteredMaterials.length === 0 && searchTerm ? ( // Mensagem para busca sem resultados
+             <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
+               <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum material encontrado para "{searchTerm}".</Text>
+             </Box>
+           ) : (
+            <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto">
+              <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
                 <Thead>
                   <Tr>
-                    <Th>Nome</Th>
-                    <Th isNumeric>Quantidade</Th>
-                    <Th isNumeric>Mínimo</Th>
-                    <Th>Status</Th>
-                    <Th>Ações</Th>
+                    <Th whiteSpace="normal">Nome</Th>
+                    <Th isNumeric>Qtd.</Th>
+                    <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th>
+                    <Th whiteSpace="normal">Status</Th>
+                    <Th whiteSpace="normal">Ações</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
                   {filteredMaterials.map((material) => (
                     <Tr key={material.id}>
-                      <Td fontWeight="medium">{material.name}</Td>
+                      <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{material.name}</Td>
                       <Td isNumeric>{material.quantity}</Td>
-                      <Td isNumeric>{material.minQuantity}</Td>
+                      <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{material.minQuantity}</Td>
                       <Td>
                         {material.quantity < material.minQuantity ? (
-                          <Badge colorScheme="red">Comprar</Badge>
+                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="red">Comprar</Badge>
                         ) : (
-                          <Badge colorScheme="green">Em estoque</Badge>
+                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="green">Em estoque</Badge>
                         )}
                       </Td>
                       <Td>
-                        <HStack spacing={2}>
+                        <Stack 
+                          direction={{ base: 'column', lg: 'row' }} 
+                          spacing={{ base: 1, lg: 2 }}
+                          alignItems="flex-start"
+                        >
                           <IconButton
                             aria-label="Registrar uso"
                             icon={<RefreshCw size={16} />}
-                            size="sm"
+                            size="xs"
                             colorScheme="blue"
                             onClick={() => handleUsageMaterial(material)}
                           />
                           <IconButton
                             aria-label="Editar material"
                             icon={<Edit size={16} />}
-                            size="sm"
+                            size="xs"
                             colorScheme="green"
                             onClick={() => handleEditMaterial(material)}
                           />
                           <IconButton
                             aria-label="Excluir material"
                             icon={<Trash2 size={16} />}
-                            size="sm"
+                            size="xs"
                             colorScheme="red"
                             onClick={() => handleDeleteClick(material)}
                           />
-                        </HStack>
+                        </Stack>
                       </Td>
                     </Tr>
                   ))}
@@ -272,22 +288,23 @@ const MaterialsPage = () => {
         isOpen={isDeleteDialogOpen}
         leastDestructiveRef={cancelRef}
         onClose={onDeleteDialogClose}
+        isCentered
       >
         <AlertDialogOverlay>
-          <AlertDialogContent>
+          <AlertDialogContent mx={{ base: 4, md: 0 }}>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               Excluir material
             </AlertDialogHeader>
 
-            <AlertDialogBody>
+            <AlertDialogBody fontSize={{ base: 'sm', md: 'md' }}>
               Tem certeza que deseja excluir o material "{materialToDelete?.name}"? Esta ação não pode ser desfeita.
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onDeleteDialogClose}>
+              <Button ref={cancelRef} onClick={onDeleteDialogClose} size={{ base: 'sm', md: 'md' }}>
                 Cancelar
               </Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3}>
+              <Button colorScheme="red" onClick={handleDelete} ml={3} size={{ base: 'sm', md: 'md' }}>
                 Excluir
               </Button>
             </AlertDialogFooter>
