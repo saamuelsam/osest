@@ -1,5 +1,5 @@
-dotenv.config();                // 1) Carrega .env antes de qualquer outra coisa
 import dotenv from 'dotenv';
+dotenv.config();                // 1) Carrega .env antes de qualquer outra coisa
 
 import './src/database/db.js';      // 2) Inicializa a conexão MySQL
 import express from 'express';
