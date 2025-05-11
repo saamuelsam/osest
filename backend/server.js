@@ -1,11 +1,14 @@
 import dotenv from 'dotenv';
-dotenv.config();                // 1) Carrega .env antes de qualquer outra coisa
+dotenv.config(); // 1) Carrega .env antes de qualquer outra coisa
 
-import './src/database/db.js';      // 2) Inicializa a conexão MySQL
+import './src/database/db.js'; // 2) Inicializa a conexão MySQL
 import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import path from 'path';
+
+// ✅ Importa o arquivo que contém a rota /api/ping
+import routes from './src/routes/index.js';
 
 import authRoutes from './src/routes/authRoutes.js';
 import userRoutes from './src/routes/userRoutes.js';
@@ -24,7 +27,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ROTAS
+// ✅ Liga o arquivo de rotas principais ao /api
+app.use("/api", routes);
+
+// ROTAS específicas
 app.use('/api/auth',     authRoutes);
 app.use('/api/users',    userRoutes);
 app.use('/api/products', productRoutes);
