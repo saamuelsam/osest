@@ -252,6 +252,8 @@ const ProductsPage: React.FC = () => {
             onClick={resetFilters}
             variant="outline"
             size="md"
+            fontSize="sm"
+            minW="140px"
           >
             Limpar filtros
           </Button>
