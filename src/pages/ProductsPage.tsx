@@ -18,7 +18,6 @@ import {
   IconButton,
   Input,
   Select,
-  HStack,
   Text,
   useToast,
   AlertDialog,
@@ -27,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
-  Stack, // Adicionado para empilhamento responsivo de botões de ação
+  Stack,
 } from '@chakra-ui/react';
 import { Edit, Trash2, Plus, Search, RefreshCw } from 'lucide-react';
 import api from '../services/api';
@@ -35,23 +34,55 @@ import { Product } from '../types';
 import ProductModal from '../components/modals/ProductModal';
 import StockAdjustmentModal from '../components/modals/StockAdjustmentModal';
 
-const ProductsPage = () => {
+// Helper function to normalize a product object from an API response
+// Ensures all fields conform to the Product interface, especially types
+const normalizeApiProductToProductType = (apiProductData: any): Product => {
+  return {
+    // Spread unknown fields first, then explicitly type known ones
+    ...apiProductData, 
+    id: String(apiProductData.id ?? ''),
+    name: String(apiProductData.name ?? ''),
+    category: String(apiProductData.category ?? ''),
+    quantity: Number(apiProductData.quantity ?? 0),
+    minQuantity: Number(apiProductData.minQuantity ?? 0),
+    boxes: Number(apiProductData.boxes ?? 0),
+    // Handles if API returns weightKg (camelCase) or weight_kg (snake_case)
+    // and ensures the result is a number.
+    weightKg: Number(apiProductData.weightKg ?? apiProductData.weight_kg ?? 0),
+    createdAt: String(apiProductData.createdAt ?? new Date().toISOString()),
+    updatedAt: String(apiProductData.updatedAt ?? new Date().toISOString()),
+  };
+};
+
+const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [productForStockAdjustment, setProductForStockAdjustment] = useState<Product | null>(null);
-  
-  const { isOpen: isProductModalOpen, onOpen: onProductModalOpen, onClose: onProductModalClose } = useDisclosure();
-  const { isOpen: isDeleteDialogOpen, onOpen: onDeleteDialogOpen, onClose: onDeleteDialogClose } = useDisclosure();
-  const { isOpen: isStockAdjustmentOpen, onOpen: onStockAdjustmentOpen, onClose: onStockAdjustmentClose } = useDisclosure();
-  
+
+  const {
+    isOpen: isProductModalOpen,
+    onOpen: onProductModalOpen,
+    onClose: onProductModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isDeleteDialogOpen,
+    onOpen: onDeleteDialogOpen,
+    onClose: onDeleteDialogClose,
+  } = useDisclosure();
+  const {
+    isOpen: isStockAdjustmentOpen,
+    onOpen: onStockAdjustmentOpen,
+    onClose: onStockAdjustmentClose,
+  } = useDisclosure();
+
   const toast = useToast();
-  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -64,17 +95,17 @@ const ProductsPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/products');
-      setProducts(response.data);
-      
+      const response = await api.get<any[]>('/products'); // Expect an array of raw product data
+      const normalizedProducts = response.data.map(normalizeApiProductToProductType);
+      setProducts(normalizedProducts);
       const uniqueCategories = Array.from(
-        new Set(response.data.map((product: Product) => product.category))
+        new Set(normalizedProducts.map((p) => p.category).filter(Boolean)) // Filter out undefined/null categories
       );
       setCategories(uniqueCategories);
-    } catch (error) {
-      console.error('Error fetching products:', error);
+    } catch (err) {
+      console.error('Failed to fetch products:', err);
       toast({
-        title: 'Erro',
+        title: 'Erro ao buscar produtos',
         description: 'Não foi possível carregar os produtos.',
         status: 'error',
         duration: 5000,
@@ -84,20 +115,17 @@ const ProductsPage = () => {
       setLoading(false);
     }
   };
-
+  
   const filterProducts = () => {
     let result = [...products];
-    
     if (searchTerm) {
-      result = result.filter(product => 
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
+      result = result.filter((p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
     if (categoryFilter) {
-      result = result.filter(product => product.category === categoryFilter);
+      result = result.filter((p) => p.category === categoryFilter);
     }
-    
     setFilteredProducts(result);
   };
 
@@ -118,10 +146,9 @@ const ProductsPage = () => {
 
   const handleDelete = async () => {
     if (!productToDelete) return;
-    
     try {
       await api.delete(`/products/${productToDelete.id}`);
-      setProducts(products.filter(p => p.id !== productToDelete.id));
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
       toast({
         title: 'Produto excluído',
         description: 'O produto foi removido com sucesso.',
@@ -129,10 +156,10 @@ const ProductsPage = () => {
         duration: 5000,
         isClosable: true,
       });
-    } catch (error) {
-      console.error('Error deleting product:', error);
+    } catch (err) {
+      console.error(err);
       toast({
-        title: 'Erro',
+        title: 'Erro ao excluir',
         description: 'Não foi possível excluir o produto.',
         status: 'error',
         duration: 5000,
@@ -140,6 +167,7 @@ const ProductsPage = () => {
       });
     } finally {
       onDeleteDialogClose();
+      setProductToDelete(null);
     }
   };
 
@@ -148,17 +176,25 @@ const ProductsPage = () => {
     onStockAdjustmentOpen();
   };
 
-  const handleProductSaved = (savedProduct: Product) => {
-    if (selectedProduct) {
-      setProducts(products.map(p => p.id === savedProduct.id ? savedProduct : p));
-    } else {
-      setProducts([...products, savedProduct]);
-    }
+  // Callback for when a product is saved (created or updated) via ProductModal
+  // Expects raw data from the API response
+  const handleProductSaved = (savedProductFromApi: any) => {
+    const normalizedSavedProduct = normalizeApiProductToProductType(savedProductFromApi);
+    setProducts((prevProducts) =>
+      prevProducts.some((p) => p.id === normalizedSavedProduct.id)
+        ? prevProducts.map((p) => (p.id === normalizedSavedProduct.id ? normalizedSavedProduct : p))
+        : [...prevProducts, normalizedSavedProduct]
+    );
     onProductModalClose();
   };
 
-  const handleStockAdjusted = (updatedProduct: Product) => {
-    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  // Callback for when stock is adjusted via StockAdjustmentModal
+  // Expects raw data from the API response
+  const handleStockAdjusted = (updatedProductFromApi: any) => {
+    const normalizedAdjustedProduct = normalizeApiProductToProductType(updatedProductFromApi);
+    setProducts((prevProducts) =>
+      prevProducts.map((p) => (p.id === normalizedAdjustedProduct.id ? normalizedAdjustedProduct : p))
+    );
     onStockAdjustmentClose();
   };
 
@@ -168,194 +204,164 @@ const ProductsPage = () => {
   };
 
   return (
-    <Box p={{ base: 4, md: 6 }}> {/* Padding responsivo */}
-      <Flex 
-        direction={{ base: 'column', sm: 'row' }} // Empilha em telas muito pequenas
-        justify="space-between" 
-        align={{ base: 'flex-start', sm: 'center' }} // Alinhamento responsivo
+    <Box p={{ base: 4, md: 6 }}>
+      <Flex
+        direction={{ base: 'column', sm: 'row' }}
+        justify="space-between"
+        align={{ base: 'flex-start', sm: 'center' }}
         mb={6}
-        gap={4} // Espaçamento entre título e botão quando empilhados
+        gap={4}
       >
-        <Heading size={{ base: 'md', md: 'lg' }}>Gerenciar Produtos</Heading> {/* Tamanho do título responsivo */}
-        <Button 
-          leftIcon={<Plus size={18} />} 
-          colorScheme="green" 
+        <Heading size={{ base: 'md', md: 'lg' }}>Gerenciar Produtos</Heading>
+        <Button
+          leftIcon={<Plus size={18} />}
+          colorScheme="green"
           bg="brand.primary"
           onClick={handleAddProduct}
-          _hover={{ bg: 'brand.primary', opacity: 0.9 }}
-          w={{ base: 'full', sm: 'auto' }} // Botão ocupa largura total em telas pequenas
-          size={{ base: 'md', md: 'md' }}
+          _hover={{ opacity: 0.9 }}
+          w={{ base: 'full', sm: 'auto' }}
         >
           Novo Produto
         </Button>
       </Flex>
-      
-      <Box bg="white" p={{ base: 3, md: 4 }} rounded="md" shadow="sm" mb={6}> {/* Padding responsivo */}
-        <Flex 
-          direction={{ base: 'column', lg: 'row' }} // Empilha até 'lg'
-          gap={4} 
-          align={{ base: 'stretch', lg: 'center' }}
-        >
-          <Box flex={{ base: 'none', lg: '1' }} w={{ base: '100%', lg: 'auto' }}> {/* Input de busca ocupa mais espaço */}
-            <Flex>
-              <Input
-                placeholder="Buscar produtos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                focusBorderColor="brand.primary"
-                size={{ base: 'sm', md: 'md' }}
-              />
-              <IconButton
-                aria-label="Buscar"
-                icon={<Search size={18} />}
-                ml={2}
-                colorScheme="green"
-                variant="outline"
-                size={{ base: 'sm', md: 'md' }}
-              />
-            </Flex>
-          </Box>
-          
-          <Box w={{ base: '100%', md: '250px', lg: '200px' }}> {/* Largura do select responsiva */}
-            <Select
-              placeholder="Filtrar por categoria"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              focusBorderColor="brand.primary"
-              size={{ base: 'sm', md: 'md' }}
-            >
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </Select>
-          </Box>
-          
+
+      <Box bg="white" p={{ base: 3, md: 4 }} rounded="md" shadow="sm" mb={6}>
+        <Flex direction={{ base: 'column', lg: 'row' }} gap={4} align="center">
+          <Input
+            placeholder="Buscar produtos..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            focusBorderColor="brand.primary"
+            size="md"
+          />
+          <Select
+            placeholder="Filtrar por categoria"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            focusBorderColor="brand.primary"
+            size="md"
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </Select>
           <Button
             leftIcon={<RefreshCw size={16} />}
             onClick={resetFilters}
-            variant="ghost"
-            size={{ base: 'sm', md: 'md' }}
-            w={{ base: 'full', lg: 'auto' }} // Botão de limpar ocupa largura total em telas pequenas/médias quando empilhado
+            variant="outline"
+            size="md"
           >
             Limpar filtros
           </Button>
         </Flex>
       </Box>
-      
+
       {loading ? (
         <Center h="200px">
           <Spinner size="xl" color="brand.primary" />
         </Center>
       ) : (
-        <>
-          {filteredProducts.length === 0 ? (
-            <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
-              <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum produto encontrado.</Text>
-            </Box>
-          ) : (
-            <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto">
-              <Table variant="simple" size={{ base: 'sm', md: 'md' }}> {/* Tamanho da tabela responsivo */}
-                <Thead>
-                  <Tr>
-                    <Th whiteSpace="normal">Nome</Th>
-                    <Th display={{ base: 'none', md: 'table-cell' }} whiteSpace="normal">Categoria</Th> {/* Oculta em telas menores que md */}
-                    <Th isNumeric>Qtd.</Th> {/* Abreviado para economizar espaço */}
-                    <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th> {/* Oculta em telas muito pequenas */}
-                    <Th whiteSpace="normal">Status</Th>
-                    <Th whiteSpace="normal">Ações</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredProducts.map((product) => (
-                    <Tr key={product.id}>
-                      <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{product.name}</Td>
-                      <Td display={{ base: 'none', md: 'table-cell' }} whiteSpace="normal" wordBreak="break-word">{product.category}</Td>
-                      <Td isNumeric>{product.quantity}</Td>
-                      <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{product.minQuantity}</Td>
-                      <Td>
-                        {product.quantity < product.minQuantity ? (
-                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="red">Baixo estoque</Badge>
-                        ) : (
-                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="green">Normal</Badge>
-                        )}
-                      </Td>
-                      <Td>
-                        {/* Usar Stack para empilhar botões em telas pequenas, HStack para maiores */}
-                        <Stack 
-                          direction={{ base: 'column', lg: 'row' }} 
-                          spacing={{ base: 1, lg: 2 }} 
-                          alignItems="flex-start" // Para alinhar os botões à esquerda quando em coluna
-                        >
-                          <IconButton
-                            aria-label="Ajustar estoque"
-                            icon={<RefreshCw size={16} />}
-                            size="xs" // Tamanho menor para os botões de ação
-                            colorScheme="blue"
-                            onClick={() => handleStockAdjustment(product)}
-                          />
-                          <IconButton
-                            aria-label="Editar produto"
-                            icon={<Edit size={16} />}
-                            size="xs"
-                            colorScheme="green"
-                            onClick={() => handleEditProduct(product)}
-                          />
-                          <IconButton
-                            aria-label="Excluir produto"
-                            icon={<Trash2 size={16} />}
-                            size="xs"
-                            colorScheme="red"
-                            onClick={() => handleDeleteClick(product)}
-                          />
-                        </Stack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
-          )}
-        </>
+        <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto">
+          <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
+            <Thead>
+              <Tr>
+                <Th>Nome</Th>
+                <Th display={{ base: 'none', md: 'table-cell' }}>Categoria</Th>
+                <Th isNumeric>Qtd.</Th>
+                <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th>
+                <Th isNumeric>Caixas</Th>
+                <Th isNumeric>Peso (kg)</Th>
+                <Th>Status</Th> {}
+                <Th>Ações</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {filteredProducts.map((product) => (
+                <Tr key={product.id}>
+                  <Td>{product.name}</Td>
+                  <Td display={{ base: 'none', md: 'table-cell' }}>{product.category}</Td>
+                  <Td isNumeric>{product.quantity}</Td>
+                  <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{product.minQuantity}</Td>
+                  <Td isNumeric>{product.boxes ?? 0}</Td>{/* Assuming product.weightKg is now reliably a number */}
+                  <Td isNumeric>{(product.weightKg ?? 0).toFixed(2)}</Td>
+                   <Td>
+                      {product.quantity < product.minQuantity ? (
+                        <Badge fontSize={{base: '2xs', md: 'xs'}} colorScheme="red">Comprar</Badge>
+                      ) : (
+                        <Badge fontSize={{base: '2xs', md: 'xs'}} colorScheme="green">Em estoque</Badge>
+                      )}
+                    </Td>
+                  <Td> 
+                    <Stack direction={{ base: 'column', lg: 'row' }} spacing={{base: 1, lg: 2}}>
+                      <IconButton
+                        aria-label="Ajustar estoque"
+                        icon={<RefreshCw size={16} />}
+                        size="sm"
+                        colorScheme="blue"
+                        onClick={() => handleStockAdjustment(product)}
+                      />
+                      <IconButton
+                        aria-label="Editar produto"
+                        icon={<Edit size={16} />}
+                        size="sm"
+                        colorScheme="green"
+                        onClick={() => handleEditProduct(product)}
+                      />
+                      <IconButton
+                        aria-label="Excluir produto"
+                        icon={<Trash2 size={16} />}
+                        size="sm"
+                        colorScheme="red"
+                        onClick={() => handleDeleteClick(product)}
+                      />
+                    </Stack>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </TableContainer>
       )}
-      
+
+      {/* ProductModal now passes raw API data to onSave */}
       <ProductModal
         isOpen={isProductModalOpen}
         onClose={onProductModalClose}
         product={selectedProduct}
-        onSave={handleProductSaved}
+        onSave={handleProductSaved} 
         categories={categories}
       />
-      
+
+      {/* StockAdjustmentModal now passes raw API data to onAdjust */}
       <StockAdjustmentModal
         isOpen={isStockAdjustmentOpen}
         onClose={onStockAdjustmentClose}
         product={productForStockAdjustment}
         onAdjust={handleStockAdjusted}
       />
-      
+
       <AlertDialog
         isOpen={isDeleteDialogOpen}
         leastDestructiveRef={cancelRef}
         onClose={onDeleteDialogClose}
-        isCentered // Centraliza o modal
       >
         <AlertDialogOverlay>
-          <AlertDialogContent mx={{ base: 4, md: 0 }}> {/* Adiciona margem horizontal em telas pequenas */}
+          <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               Excluir produto
             </AlertDialogHeader>
 
-            <AlertDialogBody fontSize={{ base: 'sm', md: 'md' }}> {/* Tamanho da fonte do corpo responsivo */}
+            <AlertDialogBody>
               Tem certeza que deseja excluir o produto "{productToDelete?.name}"? Esta ação não pode ser desfeita.
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onDeleteDialogClose} size={{ base: 'sm', md: 'md' }}>
+              <Button ref={cancelRef} onClick={onDeleteDialogClose}>
                 Cancelar
               </Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3} size={{ base: 'sm', md: 'md' }}>
+              <Button colorScheme="red" onClick={handleDelete} ml={3}>
                 Excluir
               </Button>
             </AlertDialogFooter>

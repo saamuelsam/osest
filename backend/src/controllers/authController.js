@@ -8,6 +8,13 @@ import generateToken from '../utils/generateToken.js';
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
+  // 🔧 DEBUG: current working directory
+  console.log('🛠️ CWD:', process.cwd());
+  // 🔧 DEBUG: check JWT_SECRET availability
+  console.log('🔑 JWT_SECRET in login:', process.env.JWT_SECRET);
+  // 🔧 DEBUG: log request body
+  console.log('📥 Dados recebidos no login:', { email, password });
+
   // Check if email and password were provided
   if (!email || !password) {
     res.status(400);

@@ -17,7 +17,7 @@ import {
   Badge,
   IconButton,
   Input,
-  HStack, // Manter se usado em algum lugar, mas para ações usaremos Stack
+  // HStack, // Removido se não usado
   Text,
   useToast,
   AlertDialog,
@@ -26,13 +26,30 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
-  Stack, // Adicionado para empilhamento responsivo
+  Stack,
 } from '@chakra-ui/react';
 import { Edit, Trash2, Plus, Search, RefreshCw } from 'lucide-react';
 import api from '../services/api';
-import { Material } from '../types';
+import { Material } from '../types'; // Material agora inclui boxes e weightKg
 import MaterialModal from '../components/modals/MaterialModal';
 import MaterialUsageModal from '../components/modals/MaterialUsageModal';
+
+// Helper function para normalizar dados da API para o tipo Material
+const normalizeApiMaterialToMaterialType = (apiMaterialData: any): Material => {
+  return {
+    ...apiMaterialData, // Pega todos os campos que já batem
+    id: String(apiMaterialData.id ?? ''),
+    name: String(apiMaterialData.name ?? ''),
+    quantity: Number(apiMaterialData.quantity ?? 0),
+    minQuantity: Number(apiMaterialData.minQuantity ?? 0),
+    boxes: Number(apiMaterialData.boxes ?? 0), // Normaliza boxes
+    // Lida com weightKg (camelCase) ou weight_kg (snake_case) da API
+    weightKg: Number(apiMaterialData.weightKg ?? apiMaterialData.weight_kg ?? 0), // Normaliza weightKg
+    createdAt: String(apiMaterialData.createdAt ?? new Date().toISOString()),
+    updatedAt: String(apiMaterialData.updatedAt ?? new Date().toISOString()),
+  };
+};
+
 
 const MaterialsPage = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -61,8 +78,9 @@ const MaterialsPage = () => {
   const fetchMaterials = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/materials');
-      setMaterials(response.data);
+      const response = await api.get<any[]>('/materials'); // Espera um array de dados brutos
+      const normalizedMaterials = response.data.map(normalizeApiMaterialToMaterialType);
+      setMaterials(normalizedMaterials);
     } catch (error) {
       console.error('Error fetching materials:', error);
       toast({
@@ -78,7 +96,6 @@ const MaterialsPage = () => {
   };
 
   const filterMaterials = () => {
-    // Corrigido: Aplicar filtro mesmo se searchTerm estiver vazio para resetar para todos os materiais
     let result = [...materials];
     if (searchTerm) {
       result = materials.filter(material => 
@@ -127,6 +144,7 @@ const MaterialsPage = () => {
       });
     } finally {
       onDeleteDialogClose();
+      setMaterialToDelete(null); // Limpa o estado após a operação
     }
   };
 
@@ -135,22 +153,26 @@ const MaterialsPage = () => {
     onUsageModalOpen();
   };
 
-  const handleMaterialSaved = (savedMaterial: Material) => {
-    if (selectedMaterial) {
-      setMaterials(materials.map(m => m.id === savedMaterial.id ? savedMaterial : m));
+  // onSave agora espera dados brutos da API e normaliza
+  const handleMaterialSaved = (savedMaterialFromApi: any) => {
+    const normalizedSavedMaterial = normalizeApiMaterialToMaterialType(savedMaterialFromApi);
+    if (materials.some(m => m.id === normalizedSavedMaterial.id)) { // Verifica se é uma atualização
+      setMaterials(materials.map(m => m.id === normalizedSavedMaterial.id ? normalizedSavedMaterial : m));
     } else {
-      setMaterials([...materials, savedMaterial]);
+      setMaterials([...materials, normalizedSavedMaterial]);
     }
     onMaterialModalClose();
   };
 
-  const handleMaterialUsed = (updatedMaterial: Material) => {
-    setMaterials(materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m));
+  // onUse agora espera dados brutos da API e normaliza
+  const handleMaterialUsed = (updatedMaterialFromApi: any) => {
+    const normalizedUpdatedMaterial = normalizeApiMaterialToMaterialType(updatedMaterialFromApi);
+    setMaterials(materials.map(m => m.id === normalizedUpdatedMaterial.id ? normalizedUpdatedMaterial : m));
     onUsageModalClose();
   };
 
   return (
-    <Box p={{ base: 4, md: 6 }}> {/* Padding responsivo */}
+    <Box p={{ base: 4, md: 6 }}>
       <Flex 
         direction={{ base: 'column', sm: 'row' }}
         justify="space-between" 
@@ -161,9 +183,9 @@ const MaterialsPage = () => {
         <Heading size={{ base: 'md', md: 'lg' }}>Materiais de Uso Interno</Heading>
         <Button 
           leftIcon={<Plus size={18} />} 
-          colorScheme="yellow" // Ajustado para melhor contraste com brand.accent se for amarelo/laranja
+          colorScheme="yellow"
           bg="brand.accent"
-          color="gray.800" // Garantir contraste do texto do botão
+          color="gray.800"
           onClick={handleAddMaterial}
           _hover={{ bg: 'brand.accent', opacity: 0.9 }}
           w={{ base: 'full', sm: 'auto' }}
@@ -182,14 +204,7 @@ const MaterialsPage = () => {
             focusBorderColor="brand.accent"
             size={{ base: 'sm', md: 'md' }}
           />
-          <IconButton
-            aria-label="Buscar"
-            icon={<Search size={18} />}
-            ml={2}
-            colorScheme="yellow" // Coerente com o botão de adicionar
-            variant="outline"
-            size={{ base: 'sm', md: 'md' }}
-          />
+          {/* O botão de busca pode ser removido se o filtro é aplicado ao digitar */}
         </Flex>
       </Box>
       
@@ -199,11 +214,11 @@ const MaterialsPage = () => {
         </Center>
       ) : (
         <>
-          {filteredMaterials.length === 0 && !searchTerm ? ( // Mostrar apenas se não houver materiais e não houver busca
+          {filteredMaterials.length === 0 && !searchTerm ? (
              <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
                <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum material cadastrado.</Text>
              </Box>
-           ) : filteredMaterials.length === 0 && searchTerm ? ( // Mensagem para busca sem resultados
+           ) : filteredMaterials.length === 0 && searchTerm ? (
              <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
                <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum material encontrado para "{searchTerm}".</Text>
              </Box>
@@ -215,6 +230,8 @@ const MaterialsPage = () => {
                     <Th whiteSpace="normal">Nome</Th>
                     <Th isNumeric>Qtd.</Th>
                     <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th>
+                    <Th isNumeric>Caixas</Th>      {/* Adicionado Cabeçalho */}
+                    <Th isNumeric>Peso (kg)</Th>   {/* Adicionado Cabeçalho */}
                     <Th whiteSpace="normal">Status</Th>
                     <Th whiteSpace="normal">Ações</Th>
                   </Tr>
@@ -225,6 +242,8 @@ const MaterialsPage = () => {
                       <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{material.name}</Td>
                       <Td isNumeric>{material.quantity}</Td>
                       <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{material.minQuantity}</Td>
+                      <Td isNumeric>{material.boxes ?? 0}</Td> {/* Adicionado Dado */}
+                      <Td isNumeric>{(material.weightKg ?? 0).toFixed(2)}</Td> {/* Adicionado Dado */}
                       <Td>
                         {material.quantity < material.minQuantity ? (
                           <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="red">Comprar</Badge>
@@ -236,7 +255,7 @@ const MaterialsPage = () => {
                         <Stack 
                           direction={{ base: 'column', lg: 'row' }} 
                           spacing={{ base: 1, lg: 2 }}
-                          alignItems="flex-start"
+                          alignItems="flex-start" // Garante que os botões se alinhem bem em coluna
                         >
                           <IconButton
                             aria-label="Registrar uso"
@@ -274,14 +293,14 @@ const MaterialsPage = () => {
         isOpen={isMaterialModalOpen}
         onClose={onMaterialModalClose}
         material={selectedMaterial}
-        onSave={handleMaterialSaved}
+        onSave={handleMaterialSaved} // Passa a função que espera dados brutos
       />
       
       <MaterialUsageModal
         isOpen={isUsageModalOpen}
         onClose={onUsageModalClose}
         material={materialForUsage}
-        onUse={handleMaterialUsed}
+        onUse={handleMaterialUsed} // Passa a função que espera dados brutos
       />
       
       <AlertDialog

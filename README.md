@@ -17,7 +17,7 @@ O Sistema de Gestão de Estoque e Materiais para a empresa "Orgânicos da Fátim
 - Chakra UI para interface de usuário
 - React Router para navegação
 - Axios para requisições HTTP
-- Lucide React para ícones
+- Lucide React para ícones.
 
 ### Backend
 - Node.js com Express

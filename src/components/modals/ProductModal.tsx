@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Modal,
   ModalOverlay,
@@ -20,9 +20,9 @@ import {
   useToast,
   FormErrorMessage,
   VStack,
-} from '@chakra-ui/react';
-import { Product, ProductFormData } from '../../types';
-import api from '../../services/api';
+} from "@chakra-ui/react";
+import { Product, ProductFormData } from "../../types";
+import api from "../../services/api";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -32,17 +32,34 @@ interface ProductModalProps {
   categories: string[];
 }
 
-const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductModalProps) => {
+// Form error messages in camelCase
+interface ProductFormErrors {
+  name?: string;
+  category?: string;
+  quantity?: string;
+  minQuantity?: string;
+  boxes?: string;
+  weightKg?: string;
+}
+
+const ProductModal: React.FC<ProductModalProps> = ({
+  isOpen,
+  onClose,
+  product,
+  onSave,
+  categories,
+}) => {
   const [formData, setFormData] = useState<ProductFormData>({
-    name: '',
-    category: '',
+    name: "",
+    category: "",
     quantity: 0,
     minQuantity: 0,
+    boxes: 0,
+    weightKg: 0,
   });
-  const [newCategory, setNewCategory] = useState('');
-  const [errors, setErrors] = useState<Partial<ProductFormData>>({});
+  const [newCategory, setNewCategory] = useState("");
+  const [errors, setErrors] = useState<ProductFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const toast = useToast();
 
   useEffect(() => {
@@ -52,6 +69,8 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
         category: product.category,
         quantity: product.quantity,
         minQuantity: product.minQuantity,
+        boxes: product.boxes || 0,
+        weightKg: product.weightKg || 0,
       });
     } else {
       resetForm();
@@ -59,81 +78,50 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
   }, [product, isOpen]);
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      category: '',
-      quantity: 0,
-      minQuantity: 0,
-    });
-    setNewCategory('');
+    setFormData({ name: "", category: "", quantity: 0, minQuantity: 0, boxes: 0, weightKg: 0 });
+    setNewCategory("");
     setErrors({});
   };
 
   const validateForm = () => {
-    const newErrors: Partial<ProductFormData> = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Nome é obrigatório';
-    }
-    
-    if (!formData.category && !newCategory) {
-      newErrors.category = 'Categoria é obrigatória';
-    }
-    
-    if (formData.quantity < 0) {
-      newErrors.quantity = 'Quantidade não pode ser negativa';
-    }
-    
-    if (formData.minQuantity < 0) {
-      newErrors.minQuantity = 'Quantidade mínima não pode ser negativa';
-    }
-    
+    const newErrors: ProductFormErrors = {};
+    if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
+    if (!formData.category && !newCategory) newErrors.category = "Categoria é obrigatória";
+    if (formData.quantity < 0) newErrors.quantity = "Quantidade inválida";
+    if (formData.minQuantity < 0) newErrors.minQuantity = "Quantidade mínima inválida";
+    if (formData.boxes < 0) newErrors.boxes = "Número de caixas inválido";
+    if (formData.weightKg < 0) newErrors.weightKg = "Peso inválido";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    
     setIsSubmitting(true);
-    
+    const productDataToSubmit = { ...formData, category: newCategory || formData.category };
+    console.log("Enviando payload:", productDataToSubmit);
     try {
-      const productData = {
-        ...formData,
-        category: newCategory || formData.category,
-      };
-      
       let response;
-      
       if (product) {
-        // Update existing product
-        response = await api.put(`/products/${product.id}`, productData);
-        toast({
-          title: 'Produto atualizado',
-          description: 'O produto foi atualizado com sucesso.',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+        response = await api.put(`/products/${product.id}`, productDataToSubmit);
       } else {
-        // Create new product
-        response = await api.post('/products', productData);
-        toast({
-          title: 'Produto criado',
-          description: 'O produto foi criado com sucesso.',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+        response = await api.post("/products", productDataToSubmit);
       }
-      
       onSave(response.data);
-    } catch (error) {
-      console.error('Error saving product:', error);
+      onClose();
       toast({
-        title: 'Erro',
-        description: 'Ocorreu um erro ao salvar o produto.',
-        status: 'error',
+        title: product ? "Produto atualizado" : "Produto criado",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (err: any) {
+      console.error("Erro salvando produto:", err.response || err.message);
+      const msg = err.response?.data?.message || "Erro ao salvar produto";
+      toast({
+        title: "Erro",
+        description: msg,
+        status: "error",
         duration: 5000,
         isClosable: true,
       });
@@ -144,24 +132,22 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNumberChange = (name: string, value: number) => {
-    setFormData({ ...formData, [name]: value });
+  const handleNumberChange = (name: keyof ProductFormData, _str: string, num: number) => {
+    setFormData((prev) => ({ ...prev, [name]: isNaN(num) ? 0 : num }));
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} size="md" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>
-          {product ? 'Editar Produto' : 'Novo Produto'}
-        </ModalHeader>
+        <ModalHeader>{product ? "Editar Produto" : "Novo Produto"}</ModalHeader>
         <ModalCloseButton />
-        
         <ModalBody>
           <VStack spacing={4}>
+            {/* Nome */}
             <FormControl isInvalid={!!errors.name}>
               <FormLabel>Nome</FormLabel>
               <Input
@@ -173,7 +159,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
               />
               {errors.name && <FormErrorMessage>{errors.name}</FormErrorMessage>}
             </FormControl>
-            
+            {/* Categoria */}
             <FormControl isInvalid={!!errors.category}>
               <FormLabel>Categoria</FormLabel>
               <Select
@@ -183,33 +169,33 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
                 placeholder="Selecione uma categoria"
                 focusBorderColor="brand.primary"
               >
-                {categories.map(category => (
-                  <option key={category} value={category}>
-                    {category}
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
                   </option>
                 ))}
                 <option value="new">+ Nova categoria</option>
               </Select>
               {errors.category && <FormErrorMessage>{errors.category}</FormErrorMessage>}
             </FormControl>
-            
-            {formData.category === 'new' && (
+            {/* Nova Categoria */}
+            {formData.category === "new" && (
               <FormControl>
                 <FormLabel>Nova Categoria</FormLabel>
                 <Input
+                  placeholder="Nome da nova categoria"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
-                  placeholder="Nome da nova categoria"
                   focusBorderColor="brand.primary"
                 />
               </FormControl>
             )}
-            
+            {/* Quantidade */}
             <FormControl isInvalid={!!errors.quantity}>
               <FormLabel>Quantidade</FormLabel>
               <NumberInput
                 value={formData.quantity}
-                onChange={(_, value) => handleNumberChange('quantity', value)}
+                onChange={(_, v) => handleNumberChange("quantity", "", v)}
                 min={0}
                 focusBorderColor="brand.primary"
               >
@@ -221,12 +207,12 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
               </NumberInput>
               {errors.quantity && <FormErrorMessage>{errors.quantity}</FormErrorMessage>}
             </FormControl>
-            
+            {/* Min. Quantidade */}
             <FormControl isInvalid={!!errors.minQuantity}>
               <FormLabel>Quantidade Mínima</FormLabel>
               <NumberInput
                 value={formData.minQuantity}
-                onChange={(_, value) => handleNumberChange('minQuantity', value)}
+                onChange={(_, v) => handleNumberChange("minQuantity", "", v)}
                 min={0}
                 focusBorderColor="brand.primary"
               >
@@ -238,21 +224,56 @@ const ProductModal = ({ isOpen, onClose, product, onSave, categories }: ProductM
               </NumberInput>
               {errors.minQuantity && <FormErrorMessage>{errors.minQuantity}</FormErrorMessage>}
             </FormControl>
+            {/* Caixas */}
+            <FormControl isInvalid={!!errors.boxes}>
+              <FormLabel>Caixas</FormLabel>
+              <NumberInput
+                value={formData.boxes}
+                onChange={(_, v) => handleNumberChange("boxes", "", v)}
+                min={0}
+                focusBorderColor="brand.primary"
+              >
+                <NumberInputField placeholder="Qtd. de caixas" />
+                <NumberInputStepper>
+                  <NumberIncrementStepper />
+                  <NumberDecrementStepper />
+                </NumberInputStepper>
+              </NumberInput>
+              {errors.boxes && <FormErrorMessage>{errors.boxes}</FormErrorMessage>}
+            </FormControl>
+            {/* Peso (kg) */}
+            <FormControl isInvalid={!!errors.weightKg}>
+              <FormLabel>Peso (kg)</FormLabel>
+              <NumberInput
+                precision={2}
+                step={0.01}
+                value={formData.weightKg}
+                onChange={(_, v) => handleNumberChange("weightKg", "", v)}
+                min={0}
+                focusBorderColor="brand.primary"
+              >
+                <NumberInputField placeholder="Peso em kg" />
+                <NumberInputStepper>
+                  <NumberIncrementStepper />
+                  <NumberDecrementStepper />
+                </NumberInputStepper>
+              </NumberInput>
+              {errors.weightKg && <FormErrorMessage>{errors.weightKg}</FormErrorMessage>}
+            </FormControl>
           </VStack>
         </ModalBody>
-
         <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose}>
+          <Button variant="ghost" mr={3} onClick={onClose} isDisabled={isSubmitting}>
             Cancelar
           </Button>
           <Button
             colorScheme="green"
-            bg="brand.primary"
             onClick={handleSubmit}
             isLoading={isSubmitting}
-            _hover={{ bg: 'brand.primary', opacity: 0.9 }}
+            bg="brand.primary"
+            _hover={{ bg: "brand.primary", opacity: 0.9 }}
           >
-            {product ? 'Atualizar' : 'Salvar'}
+            {product ? "Atualizar" : "Salvar"}
           </Button>
         </ModalFooter>
       </ModalContent>

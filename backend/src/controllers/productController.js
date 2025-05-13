@@ -27,20 +27,29 @@ export const getProductById = asyncHandler(async (req, res) => {
 // @route   POST /api/products
 // @access  Private
 export const createProduct = asyncHandler(async (req, res) => {
-  const { name, category, quantity, minQuantity } = req.body;
-  
+  const {
+    name,
+    category,
+    quantity      = 0,
+    minQuantity   = 0,
+    boxes         = 0,        // NOVO
+    weightKg      = 0         // NOVO
+  } = req.body;
+
   if (!name || !category) {
     res.status(400);
     throw new Error('Please provide name and category');
   }
-  
+
   const product = await productModel.createProduct({
     name,
     category,
-    quantity: quantity || 0,
-    minQuantity: minQuantity || 0,
+    quantity:     Number(quantity),
+    minQuantity:  Number(minQuantity),
+    boxes:        Number(boxes),
+    weightKg:     Number(weightKg)
   });
-  
+
   if (product) {
     res.status(201).json(product);
   } else {
@@ -49,27 +58,34 @@ export const createProduct = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update a product
-// @route   PUT /api/products/:id
-// @access  Private
+// ---------- UPDATE ----------
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { name, category, quantity, minQuantity } = req.body;
+  const {
+    name,
+    category,
+    quantity,
+    minQuantity,
+    boxes,
+    weightKg                    
+  } = req.body;
+
   const productId = req.params.id;
-  
-  const product = await productModel.getProductById(productId);
-  
+  const product   = await productModel.getProductById(productId);
+
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
   }
-  
+
   const updatedProduct = await productModel.updateProduct(productId, {
-    name: name || product.name,
-    category: category || product.category,
-    quantity: quantity !== undefined ? quantity : product.quantity,
-    minQuantity: minQuantity !== undefined ? minQuantity : product.minQuantity,
+    name:        name        ?? product.name,
+    category:    category    ?? product.category,
+    quantity:    quantity    ?? product.quantity,
+    minQuantity: minQuantity ?? product.minQuantity,
+    boxes:       boxes       ?? product.boxes,      
+    weightKg:    weightKg    ?? product.weightKg    
   });
-  
+
   res.json(updatedProduct);
 });
 

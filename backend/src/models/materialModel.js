@@ -8,6 +8,8 @@ export const getAllMaterials = async () => {
       name, 
       quantity, 
       min_quantity as minQuantity,
+      boxes,                 -- Adicionado
+      weight_kg as weightKg, -- Adicionado e alias para camelCase
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM materials
@@ -24,6 +26,8 @@ export const getMaterialById = async (id) => {
       name, 
       quantity, 
       min_quantity as minQuantity,
+      boxes,                 -- Adicionado
+      weight_kg as weightKg, -- Adicionado e alias para camelCase
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM materials
@@ -34,11 +38,23 @@ export const getMaterialById = async (id) => {
 
 // Create a new material
 export const createMaterial = async (materialData) => {
-  const { name, quantity, minQuantity } = materialData;
+  // Assume que materialData pode vir com weightKg (camelCase) do controller/frontend
+  // e precisamos de weight_kg (snake_case) para o banco.
+  // Se o frontend já envia weight_kg, essa transformação não é estritamente necessária aqui,
+  // mas é uma boa prática garantir o formato correto para o banco.
+  const { name, quantity, minQuantity, boxes, weightKg } = materialData;
   
+  const params = [
+    name,
+    quantity,
+    minQuantity,
+    boxes === undefined ? null : boxes,          // Converte undefined para null
+    weightKg === undefined ? null : weightKg     // Converte undefined para null
+  ];
+
   const result = await query(
-    'INSERT INTO materials (name, quantity, min_quantity) VALUES (?, ?, ?)',
-    [name, quantity, minQuantity]
+    'INSERT INTO materials (name, quantity, min_quantity, boxes, weight_kg) VALUES (?, ?, ?, ?, ?)',
+    params
   );
   
   if (result.affectedRows === 1) {
@@ -50,11 +66,20 @@ export const createMaterial = async (materialData) => {
 
 // Update a material
 export const updateMaterial = async (id, materialData) => {
-  const { name, quantity, minQuantity } = materialData;
+  const { name, quantity, minQuantity, boxes, weightKg } = materialData;
+
+  const params = [
+    name,
+    quantity,
+    minQuantity,
+    boxes === undefined ? null : boxes,        // Converte undefined para null
+    weightKg === undefined ? null : weightKg,  // Converte undefined para null
+    id
+  ];
   
   await query(
-    'UPDATE materials SET name = ?, quantity = ?, min_quantity = ? WHERE id = ?',
-    [name, quantity, minQuantity, id]
+    'UPDATE materials SET name = ?, quantity = ?, min_quantity = ?, boxes = ?, weight_kg = ? WHERE id = ?',
+    params
   );
   
   return await getMaterialById(id);
@@ -67,6 +92,7 @@ export const deleteMaterial = async (id) => {
 };
 
 // Adjust material quantity (mostly for adding new inventory)
+// Esta função não mexe diretamente com boxes ou weight_kg, mas getMaterialById retornará os campos atualizados.
 export const adjustMaterialQuantity = async (id, quantity, userId) => {
   // Get current material
   const material = await getMaterialById(id);
@@ -89,6 +115,7 @@ export const adjustMaterialQuantity = async (id, quantity, userId) => {
 };
 
 // Record material usage
+// Esta função não mexe diretamente com boxes ou weight_kg, mas getMaterialById retornará os campos atualizados.
 export const useMaterial = async (id, quantity, description, userId) => {
   // Get current material
   const material = await getMaterialById(id);
@@ -123,6 +150,8 @@ export const getLowStockMaterials = async () => {
       name, 
       quantity, 
       min_quantity as minQuantity,
+      boxes,                 -- Adicionado
+      weight_kg as weightKg, -- Adicionado e alias para camelCase
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM materials
@@ -133,6 +162,7 @@ export const getLowStockMaterials = async () => {
 };
 
 // Get material movement history
+// Esta função não lida diretamente com os campos boxes/weight_kg da tabela materials.
 export const getMaterialMovements = async (materialId) => {
   const rows = await query(`
     SELECT 

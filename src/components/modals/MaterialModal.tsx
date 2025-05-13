@@ -20,7 +20,7 @@ import {
   FormErrorMessage,
   VStack,
 } from '@chakra-ui/react';
-import { Material, MaterialFormData } from '../../types';
+import { Material, MaterialFormData } from '../../types'; // MaterialFormData agora inclui boxes e weightKg
 import api from '../../services/api';
 
 interface MaterialModalProps {
@@ -30,15 +30,30 @@ interface MaterialModalProps {
   onSave: (material: Material) => void;
 }
 
-const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps) => {
+// Interface para erros do formulário
+interface MaterialFormErrors {
+  name?: string;
+  quantity?: string;
+  minQuantity?: string;
+  boxes?: string;      // Adicionado
+  weightKg?: string;   // Adicionado
+}
+
+const MaterialModal: React.FC<MaterialModalProps> = ({
+  isOpen,
+  onClose,
+  material,
+  onSave,
+}) => {
   const [formData, setFormData] = useState<MaterialFormData>({
     name: '',
     quantity: 0,
     minQuantity: 0,
+    boxes: 0,        // Adicionado
+    weightKg: 0,     // Adicionado
   });
-  const [errors, setErrors] = useState<Partial<MaterialFormData>>({});
+  const [errors, setErrors] = useState<MaterialFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const toast = useToast();
 
   useEffect(() => {
@@ -47,6 +62,8 @@ const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps
         name: material.name,
         quantity: material.quantity,
         minQuantity: material.minQuantity,
+        boxes: material.boxes || 0,          // Adicionado
+        weightKg: material.weightKg || 0,    // Adicionado
       });
     } else {
       resetForm();
@@ -58,65 +75,64 @@ const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps
       name: '',
       quantity: 0,
       minQuantity: 0,
+      boxes: 0,        // Adicionado
+      weightKg: 0,     // Adicionado
     });
     setErrors({});
   };
 
   const validateForm = () => {
-    const newErrors: Partial<MaterialFormData> = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Nome é obrigatório';
+    const newErrors: MaterialFormErrors = {};
+    if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório';
+    if (typeof formData.quantity !== 'number' || formData.quantity < 0) {
+      newErrors.quantity = 'Quantidade inválida';
     }
-    
-    if (formData.quantity < 0) {
-      newErrors.quantity = 'Quantidade não pode ser negativa';
+    if (typeof formData.minQuantity !== 'number' || formData.minQuantity < 0) {
+      newErrors.minQuantity = 'Quantidade mínima inválida';
     }
-    
-    if (formData.minQuantity < 0) {
-      newErrors.minQuantity = 'Quantidade mínima não pode ser negativa';
+    if (formData.boxes !== undefined && (typeof formData.boxes !== 'number' || formData.boxes < 0)) { // Adicionado
+      newErrors.boxes = 'Número de caixas inválido';
     }
-    
+    if (formData.weightKg !== undefined && (typeof formData.weightKg !== 'number' || formData.weightKg < 0)) { // Adicionado
+      newErrors.weightKg = 'Peso inválido';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    
     setIsSubmitting(true);
-    
+
+    // Backend pode esperar weight_kg (snake_case)
+    // Se for o caso, transforme aqui antes de enviar:
+    // const { weightKg, ...rest } = formData;
+    // const dataToSend = { ...rest, weight_kg: weightKg };
+    // Por enquanto, enviaremos como está em formData (weightKg)
+    const dataToSend = { ...formData };
+
+console.log('Dados enviados para o backend (Material):', dataToSend);
     try {
       let response;
-      
       if (material) {
-        // Update existing material
-        response = await api.put(`/materials/${material.id}`, formData);
-        toast({
-          title: 'Material atualizado',
-          description: 'O material foi atualizado com sucesso.',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+        response = await api.put(`/materials/${material.id}`, dataToSend);
       } else {
-        // Create new material
-        response = await api.post('/materials', formData);
-        toast({
-          title: 'Material criado',
-          description: 'O material foi criado com sucesso.',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+        response = await api.post('/materials', dataToSend);
       }
-      
-      onSave(response.data);
-    } catch (error) {
-      console.error('Error saving material:', error);
+      onSave(response.data); // response.data deve ser o material salvo/atualizado
+      onClose();
+      toast({
+        title: material ? 'Material atualizado' : 'Material criado',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (err: any) {
+      console.error('Erro salvando material:', err.response?.data || err.message);
+      const errorMsg = err.response?.data?.message || 'Erro ao salvar material.';
       toast({
         title: 'Erro',
-        description: 'Ocorreu um erro ao salvar o material.',
+        description: errorMsg,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -128,23 +144,27 @@ const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNumberChange = (name: string, value: number) => {
-    setFormData({ ...formData, [name]: value });
+  const handleNumberChange = (
+    name: keyof MaterialFormData,
+    _valueAsString: string,
+    valueAsNumber: number
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: isNaN(valueAsNumber) ? 0 : valueAsNumber,
+    }));
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} size="md" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>
-          {material ? 'Editar Material' : 'Novo Material'}
-        </ModalHeader>
+        <ModalHeader>{material ? 'Editar Material' : 'Novo Material'}</ModalHeader>
         <ModalCloseButton />
-        
-        <ModalBody>
+        <ModalBody pb={6}>
           <VStack spacing={4}>
             <FormControl isInvalid={!!errors.name}>
               <FormLabel>Nome</FormLabel>
@@ -157,12 +177,12 @@ const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps
               />
               {errors.name && <FormErrorMessage>{errors.name}</FormErrorMessage>}
             </FormControl>
-            
+
             <FormControl isInvalid={!!errors.quantity}>
               <FormLabel>Quantidade</FormLabel>
               <NumberInput
                 value={formData.quantity}
-                onChange={(_, value) => handleNumberChange('quantity', value)}
+                onChange={(str, num) => handleNumberChange('quantity', str, num)}
                 min={0}
                 focusBorderColor="brand.accent"
               >
@@ -172,14 +192,14 @@ const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps
                   <NumberDecrementStepper />
                 </NumberInputStepper>
               </NumberInput>
-              {errors.quantity && <FormErrorMessage>{errors.quantity}</FormErrorMessage>}
+              {errors.quantity && (<FormErrorMessage>{errors.quantity}</FormErrorMessage>)}
             </FormControl>
-            
+
             <FormControl isInvalid={!!errors.minQuantity}>
               <FormLabel>Quantidade Mínima</FormLabel>
               <NumberInput
                 value={formData.minQuantity}
-                onChange={(_, value) => handleNumberChange('minQuantity', value)}
+                onChange={(str, num) => handleNumberChange('minQuantity', str, num)}
                 min={0}
                 focusBorderColor="brand.accent"
               >
@@ -189,22 +209,60 @@ const MaterialModal = ({ isOpen, onClose, material, onSave }: MaterialModalProps
                   <NumberDecrementStepper />
                 </NumberInputStepper>
               </NumberInput>
-              {errors.minQuantity && <FormErrorMessage>{errors.minQuantity}</FormErrorMessage>}
+              {errors.minQuantity && (<FormErrorMessage>{errors.minQuantity}</FormErrorMessage>)}
+            </FormControl>
+
+            {/* Novo campo Caixas */}
+            <FormControl isInvalid={!!errors.boxes}>
+              <FormLabel>Caixas</FormLabel>
+              <NumberInput
+                value={formData.boxes}
+                onChange={(str, num) => handleNumberChange('boxes', str, num)}
+                min={0}
+                focusBorderColor="brand.accent"
+              >
+                <NumberInputField placeholder="Qtd. de caixas" />
+                <NumberInputStepper>
+                  <NumberIncrementStepper />
+                  <NumberDecrementStepper />
+                </NumberInputStepper>
+              </NumberInput>
+              {errors.boxes && <FormErrorMessage>{errors.boxes}</FormErrorMessage>}
+            </FormControl>
+
+            {/* Novo campo Peso (kg) */}
+            <FormControl isInvalid={!!errors.weightKg}>
+              <FormLabel>Peso (kg)</FormLabel>
+              <NumberInput
+                precision={2}
+                step={0.01}
+                value={formData.weightKg}
+                onChange={(str, num) => handleNumberChange('weightKg', str, num)}
+                min={0}
+                focusBorderColor="brand.accent"
+              >
+                <NumberInputField placeholder="Peso em kg" />
+                <NumberInputStepper>
+                  <NumberIncrementStepper />
+                  <NumberDecrementStepper />
+                </NumberInputStepper>
+              </NumberInput>
+              {errors.weightKg && <FormErrorMessage>{errors.weightKg}</FormErrorMessage>}
             </FormControl>
           </VStack>
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose}>
+          <Button variant="ghost" mr={3} onClick={onClose} isDisabled={isSubmitting}>
             Cancelar
           </Button>
           <Button
-            colorScheme="green"
+            colorScheme="yellow" // Manter consistência com a página
             bg="brand.accent"
             color="gray.800"
             onClick={handleSubmit}
             isLoading={isSubmitting}
-            _hover={{ bg: 'brand.accent', opacity: 0.9 }}
+            _hover={{ opacity: 0.9 }}
           >
             {material ? 'Atualizar' : 'Salvar'}
           </Button>

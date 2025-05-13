@@ -9,6 +9,8 @@ export const getAllProducts = async () => {
       category, 
       quantity, 
       min_quantity as minQuantity,
+      boxes,
+      weight_kg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM products
@@ -26,6 +28,8 @@ export const getProductById = async (id) => {
       category, 
       quantity, 
       min_quantity as minQuantity,
+      boxes,
+      weight_kg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM products
@@ -36,31 +40,63 @@ export const getProductById = async (id) => {
 
 // Create a new product
 export const createProduct = async (productData) => {
-  const { name, category, quantity, minQuantity } = productData;
-  
+  const {
+    name,
+    category,
+    quantity,
+    minQuantity,
+    boxes,
+    weightKg        // <- camelCase
+  } = productData;
+
   const result = await query(
-    'INSERT INTO products (name, category, quantity, min_quantity) VALUES (?, ?, ?, ?)',
-    [name, category, quantity, minQuantity]
+    `INSERT INTO products
+     (name, category, quantity, min_quantity, boxes, weight_kg)
+     VALUES (?,?,?,?,?,?)`,
+    [
+      name,
+      category,
+      quantity,
+      minQuantity,
+      boxes ?? 0,
+      weightKg ?? 0          // nunca undefined
+    ]
   );
-  
-  if (result.affectedRows === 1) {
-    return await getProductById(result.insertId);
-  }
-  
-  return null;
+
+  return result.affectedRows === 1
+    ? getProductById(result.insertId)
+    : null;
 };
 
-// Update a product
 export const updateProduct = async (id, productData) => {
-  const { name, category, quantity, minQuantity } = productData;
-  
+  const {
+    name,
+    category,
+    quantity,
+    minQuantity,
+    boxes,
+    weightKg       // <- camelCase
+  } = productData;
+
   await query(
-    'UPDATE products SET name = ?, category = ?, quantity = ?, min_quantity = ? WHERE id = ?',
-    [name, category, quantity, minQuantity, id]
+    `UPDATE products
+     SET name = ?, category = ?, quantity = ?, min_quantity = ?,
+         boxes = ?, weight_kg = ?
+     WHERE id = ?`,
+    [
+      name,
+      category,
+      quantity,
+      minQuantity,
+      boxes   ?? 0,
+      weightKg?? 0,
+      id
+    ]
   );
-  
-  return await getProductById(id);
+
+  return getProductById(id);
 };
+
 
 // Delete a product
 export const deleteProduct = async (id) => {
@@ -108,6 +144,8 @@ export const getProductsByCategory = async (category) => {
       category, 
       quantity, 
       min_quantity as minQuantity,
+      boxes, 
+      weight_kg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM products
@@ -126,6 +164,8 @@ export const getLowStockProducts = async () => {
       category, 
       quantity, 
       min_quantity as minQuantity,
+      boxes, 
+      weight_kg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM products
