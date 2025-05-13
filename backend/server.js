@@ -9,7 +9,7 @@ import path from 'path';
 
 import pingRoutes from './src/routes/index.js';       // Route for /ping
 import authRoutes from './src/routes/authRoutes.js';   // /api/auth/login, /auth/login
-import userRoutes from './src/routes/userRoutes.js';   // /api/users
+import userRoutes from './src/routes/authRoutes.js';   // /api/users
 import productRoutes from './src/routes/productRoutes.js'; // /api/products
 import materialRoutes from './src/routes/materialRoutes.js'; // /api/materials
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
@@ -26,8 +26,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // API Routes (all prefixed with /api)
-app.use('/api/ping', pingRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/ping', pingRoutes);
 // Also allow auth without /api prefix for compatibility
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
