@@ -17,7 +17,6 @@ import {
   Badge,
   IconButton,
   Input,
-  // HStack, // Removido se não usado
   Text,
   useToast,
   AlertDialog,
@@ -27,305 +26,193 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   Stack,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  useBreakpointValue,
 } from '@chakra-ui/react';
-import { Edit, Trash2, Plus, Search, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, Plus, RefreshCw, MoreVertical } from 'lucide-react';
 import api from '../services/api';
-import { Material } from '../types'; // Material agora inclui boxes e weightKg
+import { Material } from '../types';
 import MaterialModal from '../components/modals/MaterialModal';
 import MaterialUsageModal from '../components/modals/MaterialUsageModal';
 
-// Helper function para normalizar dados da API para o tipo Material
-const normalizeApiMaterialToMaterialType = (apiMaterialData: any): Material => {
-  return {
-    ...apiMaterialData, // Pega todos os campos que já batem
-    id: String(apiMaterialData.id ?? ''),
-    name: String(apiMaterialData.name ?? ''),
-    quantity: Number(apiMaterialData.quantity ?? 0),
-    minQuantity: Number(apiMaterialData.minQuantity ?? 0),
-    boxes: Number(apiMaterialData.boxes ?? 0), // Normaliza boxes
-    // Lida com weightKg (camelCase) ou weight_kg (snake_case) da API
-    weightKg: Number(apiMaterialData.weightKg ?? apiMaterialData.weight_kg ?? 0), // Normaliza weightKg
-    createdAt: String(apiMaterialData.createdAt ?? new Date().toISOString()),
-    updatedAt: String(apiMaterialData.updatedAt ?? new Date().toISOString()),
-  };
-};
+// Normaliza dados da API para o tipo Material
+const normalizeApiMaterialToMaterialType = (apiMaterialData: any): Material => ({
+  ...apiMaterialData,
+  id: String(apiMaterialData.id ?? ''),
+  name: String(apiMaterialData.name ?? ''),
+  quantity: Number(apiMaterialData.quantity ?? 0),
+  minQuantity: Number(apiMaterialData.minQuantity ?? 0),
+  boxes: Number(apiMaterialData.boxes ?? 0),
+  weightKg: Number(apiMaterialData.weightKg ?? apiMaterialData.weight_kg ?? 0),
+  createdAt: String(apiMaterialData.createdAt ?? new Date().toISOString()),
+  updatedAt: String(apiMaterialData.updatedAt ?? new Date().toISOString()),
+});
 
-
-const MaterialsPage = () => {
+const MaterialsPage: React.FC = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
+  const [filtered, setFiltered] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
-  const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
-  const [materialForUsage, setMaterialForUsage] = useState<Material | null>(null);
-  
-  const { isOpen: isMaterialModalOpen, onOpen: onMaterialModalOpen, onClose: onMaterialModalClose } = useDisclosure();
-  const { isOpen: isDeleteDialogOpen, onOpen: onDeleteDialogOpen, onClose: onDeleteDialogClose } = useDisclosure();
-  const { isOpen: isUsageModalOpen, onOpen: onUsageModalOpen, onClose: onUsageModalClose } = useDisclosure();
-  
+  const [search, setSearch] = useState('');
+  const [selMat, setSelMat] = useState<Material | null>(null);
+  const [toDelete, setToDelete] = useState<Material | null>(null);
+  const [forUsage, setForUsage] = useState<Material | null>(null);
+
+  const isMobile = useBreakpointValue({ base: true, md: false });
+
+  const mModal = useDisclosure();
+  const dModal = useDisclosure();
+  const uModal = useDisclosure();
   const toast = useToast();
-  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    fetchMaterials();
-  }, []);
-
-  useEffect(() => {
-    filterMaterials();
-  }, [searchTerm, materials]);
+  useEffect(() => { fetchMaterials(); }, []);
+  useEffect(() => { applyFilter(); }, [search, materials]);
 
   const fetchMaterials = async () => {
     try {
       setLoading(true);
-      const response = await api.get<any[]>('/materials'); // Espera um array de dados brutos
-      const normalizedMaterials = response.data.map(normalizeApiMaterialToMaterialType);
-      setMaterials(normalizedMaterials);
+      const response = await api.get<any[]>('/materials');
+      const norm = response.data.map(normalizeApiMaterialToMaterialType);
+      setMaterials(norm);
     } catch (error) {
-      console.error('Error fetching materials:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os materiais.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      toast({ title: 'Erro ao carregar materiais', status: 'error', duration: 5000, isClosable: true });
     } finally {
       setLoading(false);
     }
   };
 
-  const filterMaterials = () => {
-    let result = [...materials];
-    if (searchTerm) {
-      result = materials.filter(material => 
-        material.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  const applyFilter = () => {
+    let out = materials;
+    if (search) {
+      out = out.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
     }
-    setFilteredMaterials(result);
+    setFiltered(out);
   };
 
-  const handleAddMaterial = () => {
-    setSelectedMaterial(null);
-    onMaterialModalOpen();
-  };
-
-  const handleEditMaterial = (material: Material) => {
-    setSelectedMaterial(material);
-    onMaterialModalOpen();
-  };
-
-  const handleDeleteClick = (material: Material) => {
-    setMaterialToDelete(material);
-    onDeleteDialogOpen();
-  };
-
-  const handleDelete = async () => {
-    if (!materialToDelete) return;
-    
+  const onAdd = () => { setSelMat(null); mModal.onOpen(); };
+  const onEdit = (m: Material) => { setSelMat(m); mModal.onOpen(); };
+  const onDeleteClick = (m: Material) => { setToDelete(m); dModal.onOpen(); };
+  const onDelete = async () => {
+    if (!toDelete) return;
     try {
-      await api.delete(`/materials/${materialToDelete.id}`);
-      setMaterials(materials.filter(m => m.id !== materialToDelete.id));
-      toast({
-        title: 'Material excluído',
-        description: 'O material foi removido com sucesso.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Error deleting material:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível excluir o material.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      await api.delete(`/materials/${toDelete.id}`);
+      setMaterials(prev => prev.filter(x => x.id !== toDelete.id));
+      toast({ title: 'Material excluído', status: 'success', duration: 5000, isClosable: true });
+    } catch {
+      toast({ title: 'Erro ao excluir', status: 'error', duration: 5000, isClosable: true });
     } finally {
-      onDeleteDialogClose();
-      setMaterialToDelete(null); // Limpa o estado após a operação
+      dModal.onClose();
+      setToDelete(null);
     }
   };
+  const onUsage = (m: Material) => { setForUsage(m); uModal.onOpen(); };
 
-  const handleUsageMaterial = (material: Material) => {
-    setMaterialForUsage(material);
-    onUsageModalOpen();
+  const onSaved = (data: any) => {
+    const mat = normalizeApiMaterialToMaterialType(data);
+    setMaterials(prev => prev.some(x => x.id === mat.id)
+      ? prev.map(x => x.id === mat.id ? mat : x)
+      : [...prev, mat]
+    );
+    mModal.onClose();
   };
 
-  // onSave agora espera dados brutos da API e normaliza
-  const handleMaterialSaved = (savedMaterialFromApi: any) => {
-    const normalizedSavedMaterial = normalizeApiMaterialToMaterialType(savedMaterialFromApi);
-    if (materials.some(m => m.id === normalizedSavedMaterial.id)) { // Verifica se é uma atualização
-      setMaterials(materials.map(m => m.id === normalizedSavedMaterial.id ? normalizedSavedMaterial : m));
-    } else {
-      setMaterials([...materials, normalizedSavedMaterial]);
-    }
-    onMaterialModalClose();
+  const onUsed = (data: any) => {
+    const mat = normalizeApiMaterialToMaterialType(data);
+    setMaterials(prev => prev.map(x => x.id === mat.id ? mat : x));
+    uModal.onClose();
   };
 
-  // onUse agora espera dados brutos da API e normaliza
-  const handleMaterialUsed = (updatedMaterialFromApi: any) => {
-    const normalizedUpdatedMaterial = normalizeApiMaterialToMaterialType(updatedMaterialFromApi);
-    setMaterials(materials.map(m => m.id === normalizedUpdatedMaterial.id ? normalizedUpdatedMaterial : m));
-    onUsageModalClose();
-  };
+  if (loading) return (<Center h="200px"><Spinner size="xl" color="brand.accent"/></Center>);
 
   return (
-    <Box p={{ base: 4, md: 6 }}>
-      <Flex 
-        direction={{ base: 'column', sm: 'row' }}
-        justify="space-between" 
-        align={{ base: 'flex-start', sm: 'center' }}
-        mb={6}
-        gap={4}
-      >
-        <Heading size={{ base: 'md', md: 'lg' }}>Materiais de Uso Interno</Heading>
-        <Button 
-          leftIcon={<Plus size={18} />} 
-          colorScheme="yellow"
-          bg="brand.accent"
-          color="gray.800"
-          onClick={handleAddMaterial}
-          _hover={{ bg: 'brand.accent', opacity: 0.9 }}
-          w={{ base: 'full', sm: 'auto' }}
-          size={{ base: 'md', md: 'md' }}
-        >
-          Novo Material
-        </Button>
+    <Box p={{ base: 3, md: 6 }}>
+      <Flex direction={{ base: 'column', sm: 'row' }} justify="space-between" mb={6} gap={4}>
+        <Heading size="lg">Materiais Internos</Heading>
+        <Button leftIcon={<Plus/>} colorScheme="yellow" onClick={onAdd} w={{ base: 'full', sm: 'auto' }}>Novo Material</Button>
       </Flex>
-      
-      <Box bg="white" p={{ base: 3, md: 4 }} rounded="md" shadow="sm" mb={6}>
-        <Flex>
-          <Input
-            placeholder="Buscar materiais..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            focusBorderColor="brand.accent"
-            size={{ base: 'sm', md: 'md' }}
-          />
-          {/* O botão de busca pode ser removido se o filtro é aplicado ao digitar */}
-        </Flex>
-      </Box>
-      
-      {loading ? (
-        <Center h="200px">
-          <Spinner size="xl" color="brand.accent" />
-        </Center>
+
+      <Flex direction={{ base: 'column', md: 'row' }} gap={4} mb={6}>
+        <Input placeholder="Buscar materiais..." value={search} onChange={e => setSearch(e.target.value)} flexGrow={1}/>
+        <Button leftIcon={<RefreshCw/>} onClick={() => setSearch('')} w={{ base: 'full', md: 'auto' }}>Limpar</Button>
+      </Flex>
+
+      {isMobile ? (
+        <Stack spacing={4}>
+          {filtered.map(m => (
+            <Box key={m.id} p={4} bg="white" shadow="sm" rounded="md">
+              <Flex justify="space-between" mb={2}>
+                <Text fontWeight="bold">{m.name}</Text>
+                <Menu>
+                  <MenuButton as={IconButton} icon={<MoreVertical/>} size="sm" variant="ghost" />
+                  <MenuList>
+                    <MenuItem icon={<RefreshCw/>} onClick={() => onUsage(m)}>Registrar Uso</MenuItem>
+                    <MenuItem icon={<Edit/>} onClick={() => onEdit(m)}>Editar</MenuItem>
+                    <MenuItem icon={<Trash2/>} onClick={() => onDeleteClick(m)} color="red.500">Excluir</MenuItem>
+                  </MenuList>
+                </Menu>
+              </Flex>
+              <Text><strong>Qtd:</strong> {m.quantity} | <strong>Mín:</strong> {m.minQuantity}</Text>
+              <Text><strong>Caixas:</strong> {m.boxes} | <strong>Peso:</strong> {m.weightKg.toFixed(2)} kg</Text>
+              <Badge mt={2} colorScheme={m.quantity < m.minQuantity ? 'red' : 'green'}>
+                {m.quantity < m.minQuantity ? 'Comprar' : 'Em estoque'}
+              </Badge>
+            </Box>
+          ))}
+        </Stack>
       ) : (
-        <>
-          {filteredMaterials.length === 0 && !searchTerm ? (
-             <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
-               <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum material cadastrado.</Text>
-             </Box>
-           ) : filteredMaterials.length === 0 && searchTerm ? (
-             <Box textAlign="center" py={10} bg="white" rounded="md" shadow="sm">
-               <Text fontSize={{ base: 'sm', md: 'md' }}>Nenhum material encontrado para "{searchTerm}".</Text>
-             </Box>
-           ) : (
-            <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto">
-              <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
-                <Thead>
-                  <Tr>
-                    <Th whiteSpace="normal">Nome</Th>
-                    <Th isNumeric>Qtd.</Th>
-                    <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th>
-                    <Th isNumeric>Caixas</Th>      {/* Adicionado Cabeçalho */}
-                    <Th isNumeric>Peso (kg)</Th>   {/* Adicionado Cabeçalho */}
-                    <Th whiteSpace="normal">Status</Th>
-                    <Th whiteSpace="normal">Ações</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredMaterials.map((material) => (
-                    <Tr key={material.id}>
-                      <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{material.name}</Td>
-                      <Td isNumeric>{material.quantity}</Td>
-                      <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{material.minQuantity}</Td>
-                      <Td isNumeric>{material.boxes ?? 0}</Td> {/* Adicionado Dado */}
-                      <Td isNumeric>{(material.weightKg ?? 0).toFixed(2)}</Td> {/* Adicionado Dado */}
-                      <Td>
-                        {material.quantity < material.minQuantity ? (
-                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="red">Comprar</Badge>
-                        ) : (
-                          <Badge fontSize={{ base: '2xs', md: 'xs' }} colorScheme="green">Em estoque</Badge>
-                        )}
-                      </Td>
-                      <Td>
-                        <Stack 
-                          direction={{ base: 'column', lg: 'row' }} 
-                          spacing={{ base: 1, lg: 2 }}
-                          alignItems="flex-start" // Garante que os botões se alinhem bem em coluna
-                        >
-                          <IconButton
-                            aria-label="Registrar uso"
-                            icon={<RefreshCw size={16} />}
-                            size="xs"
-                            colorScheme="blue"
-                            onClick={() => handleUsageMaterial(material)}
-                          />
-                          <IconButton
-                            aria-label="Editar material"
-                            icon={<Edit size={16} />}
-                            size="xs"
-                            colorScheme="green"
-                            onClick={() => handleEditMaterial(material)}
-                          />
-                          <IconButton
-                            aria-label="Excluir material"
-                            icon={<Trash2 size={16} />}
-                            size="xs"
-                            colorScheme="red"
-                            onClick={() => handleDeleteClick(material)}
-                          />
-                        </Stack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
-          )}
-        </>
+        <TableContainer>
+          <Table variant="simple">
+            <Thead>
+              <Tr>
+                <Th>Nome</Th>
+                <Th isNumeric>Qtd.</Th>
+                <Th isNumeric>Mín.</Th>
+                <Th isNumeric>Caixas</Th>
+                <Th isNumeric>Peso (kg)</Th>
+                <Th>Status</Th>
+                <Th>Ações</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {filtered.map(m => (
+                <Tr key={m.id}>
+                  <Td>{m.name}</Td>
+                  <Td isNumeric>{m.quantity}</Td>
+                  <Td isNumeric>{m.minQuantity}</Td>
+                  <Td isNumeric>{m.boxes}</Td>
+                  <Td isNumeric>{m.weightKg.toFixed(2)}</Td>
+                  <Td><Badge colorScheme={m.quantity < m.minQuantity ? 'red' : 'green'}>{m.quantity < m.minQuantity ? 'Comprar' : 'Em estoque'}</Badge></Td>
+                  <Td>
+                    <Menu>
+                      <MenuButton as={IconButton} icon={<MoreVertical/>} size="sm" variant="ghost" />
+                      <MenuList>
+                        <MenuItem icon={<RefreshCw/>} onClick={() => onUsage(m)}>Registrar Uso</MenuItem>
+                        <MenuItem icon={<Edit/>} onClick={() => onEdit(m)}>Editar</MenuItem>
+                        <MenuItem icon={<Trash2/>} onClick={() => onDeleteClick(m)} color="red.500">Excluir</MenuItem>
+                      </MenuList>
+                    </Menu>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </TableContainer>
       )}
-      
-      <MaterialModal
-        isOpen={isMaterialModalOpen}
-        onClose={onMaterialModalClose}
-        material={selectedMaterial}
-        onSave={handleMaterialSaved} // Passa a função que espera dados brutos
-      />
-      
-      <MaterialUsageModal
-        isOpen={isUsageModalOpen}
-        onClose={onUsageModalClose}
-        material={materialForUsage}
-        onUse={handleMaterialUsed} // Passa a função que espera dados brutos
-      />
-      
-      <AlertDialog
-        isOpen={isDeleteDialogOpen}
-        leastDestructiveRef={cancelRef}
-        onClose={onDeleteDialogClose}
-        isCentered
-      >
+
+      <MaterialModal isOpen={mModal.isOpen} onClose={mModal.onClose} material={selMat} onSave={onSaved} />
+      <MaterialUsageModal isOpen={uModal.isOpen} onClose={uModal.onClose} material={forUsage} onUse={onUsed} />
+
+      <AlertDialog isOpen={dModal.isOpen} leastDestructiveRef={cancelRef} onClose={dModal.onClose}>
         <AlertDialogOverlay>
-          <AlertDialogContent mx={{ base: 4, md: 0 }}>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Excluir material
-            </AlertDialogHeader>
-
-            <AlertDialogBody fontSize={{ base: 'sm', md: 'md' }}>
-              Tem certeza que deseja excluir o material "{materialToDelete?.name}"? Esta ação não pode ser desfeita.
-            </AlertDialogBody>
-
+          <AlertDialogContent>
+            <AlertDialogHeader>Excluir material</AlertDialogHeader>
+            <AlertDialogBody>Tem certeza que deseja excluir "{toDelete?.name}"?</AlertDialogBody>
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onDeleteDialogClose} size={{ base: 'sm', md: 'md' }}>
-                Cancelar
-              </Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3} size={{ base: 'sm', md: 'md' }}>
-                Excluir
-              </Button>
+              <Button ref={cancelRef} onClick={dModal.onClose}>Cancelar</Button>
+              <Button colorScheme="red" onClick={onDelete} ml={3}>Excluir</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>

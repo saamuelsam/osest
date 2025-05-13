@@ -27,298 +27,181 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   Stack,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  useBreakpointValue,
+  SimpleGrid,
 } from '@chakra-ui/react';
-import { Edit, Trash2, Plus, Search, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, Plus, RefreshCw, MoreVertical } from 'lucide-react';
 import api from '../services/api';
 import { Product } from '../types';
 import ProductModal from '../components/modals/ProductModal';
 import StockAdjustmentModal from '../components/modals/StockAdjustmentModal';
 
-// Helper function to normalize a product object from an API response
-// Ensures all fields conform to the Product interface, especially types
-const normalizeApiProductToProductType = (apiProductData: any): Product => {
-  return {
-    // Spread unknown fields first, then explicitly type known ones
-    ...apiProductData, 
-    id: String(apiProductData.id ?? ''),
-    name: String(apiProductData.name ?? ''),
-    category: String(apiProductData.category ?? ''),
-    quantity: Number(apiProductData.quantity ?? 0),
-    minQuantity: Number(apiProductData.minQuantity ?? 0),
-    boxes: Number(apiProductData.boxes ?? 0),
-    // Handles if API returns weightKg (camelCase) or weight_kg (snake_case)
-    // and ensures the result is a number.
-    weightKg: Number(apiProductData.weightKg ?? apiProductData.weight_kg ?? 0),
-    createdAt: String(apiProductData.createdAt ?? new Date().toISOString()),
-    updatedAt: String(apiProductData.updatedAt ?? new Date().toISOString()),
-  };
-};
+// Normaliza produto da API para o tipo Product
+const normalizeApiProductToProductType = (apiData: any): Product => ({
+  ...apiData,
+  id: String(apiData.id ?? ''),
+  name: String(apiData.name ?? ''),
+  category: String(apiData.category ?? ''),
+  quantity: Number(apiData.quantity ?? 0),
+  minQuantity: Number(apiData.minQuantity ?? 0),
+  boxes: Number(apiData.boxes ?? 0),
+  weightKg: Number(apiData.weightKg ?? apiData.weight_kg ?? 0),
+  createdAt: String(apiData.createdAt ?? new Date().toISOString()),
+  updatedAt: String(apiData.updatedAt ?? new Date().toISOString()),
+});
 
 const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [filtered, setFiltered] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [productForStockAdjustment, setProductForStockAdjustment] = useState<Product | null>(null);
+  const [selProd, setSelProd] = useState<Product | null>(null);
+  const [toDelete, setToDelete] = useState<Product | null>(null);
+  const [adjProd, setAdjProd] = useState<Product | null>(null);
 
-  const {
-    isOpen: isProductModalOpen,
-    onOpen: onProductModalOpen,
-    onClose: onProductModalClose,
-  } = useDisclosure();
-  const {
-    isOpen: isDeleteDialogOpen,
-    onOpen: onDeleteDialogOpen,
-    onClose: onDeleteDialogClose,
-  } = useDisclosure();
-  const {
-    isOpen: isStockAdjustmentOpen,
-    onOpen: onStockAdjustmentOpen,
-    onClose: onStockAdjustmentClose,
-  } = useDisclosure();
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
+  const pModal = useDisclosure();
+  const dModal = useDisclosure();
+  const sModal = useDisclosure();
   const toast = useToast();
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  useEffect(() => {
-    filterProducts();
-  }, [searchTerm, categoryFilter, products]);
+  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { applyFilter(); }, [search, categoryFilter, products]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get<any[]>('/products'); // Expect an array of raw product data
-      const normalizedProducts = response.data.map(normalizeApiProductToProductType);
-      setProducts(normalizedProducts);
-      const uniqueCategories = Array.from(
-        new Set(normalizedProducts.map((p) => p.category).filter(Boolean)) // Filter out undefined/null categories
-      );
-      setCategories(uniqueCategories);
-    } catch (err) {
-      console.error('Failed to fetch products:', err);
-      toast({
-        title: 'Erro ao buscar produtos',
-        description: 'Não foi possível carregar os produtos.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const filterProducts = () => {
-    let result = [...products];
-    if (searchTerm) {
-      result = result.filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    if (categoryFilter) {
-      result = result.filter((p) => p.category === categoryFilter);
-    }
-    setFilteredProducts(result);
+      const res = await api.get<any[]>('/products');
+      const norm = res.data.map(normalizeApiProductToProductType);
+      setProducts(norm);
+      setCategories(Array.from(new Set(norm.map(p => p.category).filter(Boolean))));
+    } catch (e) {
+      toast({ title: 'Erro ao buscar produtos', status: 'error', duration: 5000, isClosable: true });
+    } finally { setLoading(false); }
   };
 
-  const handleAddProduct = () => {
-    setSelectedProduct(null);
-    onProductModalOpen();
+  const applyFilter = () => {
+    let out = [...products];
+    if (search) out = out.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+    if (categoryFilter) out = out.filter(p => p.category === categoryFilter);
+    setFiltered(out);
   };
 
-  const handleEditProduct = (product: Product) => {
-    setSelectedProduct(product);
-    onProductModalOpen();
-  };
-
-  const handleDeleteClick = (product: Product) => {
-    setProductToDelete(product);
-    onDeleteDialogOpen();
-  };
-
-  const handleDelete = async () => {
-    if (!productToDelete) return;
+  const onAdd = () => { setSelProd(null); pModal.onOpen(); };
+  const onEdit = (p: Product) => { setSelProd(p); pModal.onOpen(); };
+  const onDeleteClick = (p: Product) => { setToDelete(p); dModal.onOpen(); };
+  const onDelete = async () => {
+    if (!toDelete) return;
     try {
-      await api.delete(`/products/${productToDelete.id}`);
-      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
-      toast({
-        title: 'Produto excluído',
-        description: 'O produto foi removido com sucesso.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: 'Erro ao excluir',
-        description: 'Não foi possível excluir o produto.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      onDeleteDialogClose();
-      setProductToDelete(null);
-    }
+      await api.delete(`/products/${toDelete.id}`);
+      setProducts(prev => prev.filter(x => x.id !== toDelete.id));
+      toast({ title: 'Produto excluído', status: 'success', duration: 5000, isClosable: true });
+    } catch {
+      toast({ title: 'Erro ao excluir', status: 'error', duration: 5000, isClosable: true });
+    } finally { dModal.onClose(); setToDelete(null); }
   };
+  const onAdjust = (p: Product) => { setAdjProd(p); sModal.onOpen(); };
 
-  const handleStockAdjustment = (product: Product) => {
-    setProductForStockAdjustment(product);
-    onStockAdjustmentOpen();
-  };
-
-  // Callback for when a product is saved (created or updated) via ProductModal
-  // Expects raw data from the API response
-  const handleProductSaved = (savedProductFromApi: any) => {
-    const normalizedSavedProduct = normalizeApiProductToProductType(savedProductFromApi);
-    setProducts((prevProducts) =>
-      prevProducts.some((p) => p.id === normalizedSavedProduct.id)
-        ? prevProducts.map((p) => (p.id === normalizedSavedProduct.id ? normalizedSavedProduct : p))
-        : [...prevProducts, normalizedSavedProduct]
+  const onSaved = (data: any) => {
+    const prod = normalizeApiProductToProductType(data);
+    setProducts(prev => prev.some(x => x.id === prod.id)
+      ? prev.map(x => x.id === prod.id ? prod : x)
+      : [...prev, prod]
     );
-    onProductModalClose();
+    pModal.onClose();
   };
 
-  // Callback for when stock is adjusted via StockAdjustmentModal
-  // Expects raw data from the API response
-  const handleStockAdjusted = (updatedProductFromApi: any) => {
-    const normalizedAdjustedProduct = normalizeApiProductToProductType(updatedProductFromApi);
-    setProducts((prevProducts) =>
-      prevProducts.map((p) => (p.id === normalizedAdjustedProduct.id ? normalizedAdjustedProduct : p))
-    );
-    onStockAdjustmentClose();
+  const onAdjusted = (data: any) => {
+    const prod = normalizeApiProductToProductType(data);
+    setProducts(prev => prev.map(x => x.id === prod.id ? prod : x));
+    sModal.onClose();
   };
 
-  const resetFilters = () => {
-    setSearchTerm('');
-    setCategoryFilter('');
-  };
+  const reset = () => { setSearch(''); setCategoryFilter(''); };
+
+  if (loading) return (<Center h="200px"><Spinner size="xl" color="brand.primary"/></Center>);
 
   return (
-    <Box p={{ base: 4, md: 6 }}>
-      <Flex
-        direction={{ base: 'column', sm: 'row' }}
-        justify="space-between"
-        align={{ base: 'flex-start', sm: 'center' }}
-        mb={6}
-        gap={4}
-      >
-        <Heading size={{ base: 'md', md: 'lg' }}>Gerenciar Produtos</Heading>
-        <Button
-          leftIcon={<Plus size={18} />}
-          colorScheme="green"
-          bg="brand.primary"
-          onClick={handleAddProduct}
-          _hover={{ opacity: 0.9 }}
-          w={{ base: 'full', sm: 'auto' }}
-        >
-          Novo Produto
-        </Button>
+    <Box p={{ base: 3, md: 6 }}>
+      <Flex direction={{ base: 'column', sm: 'row' }} justify="space-between" align="center" mb={6} gap={4}>
+        <Heading size="lg" whiteSpace="nowrap">Gerenciar Produtos</Heading>
+        <Button leftIcon={<Plus/>} colorScheme="green" onClick={onAdd} w={{ base: 'full', sm: 'auto' }}>Novo Produto</Button>
       </Flex>
 
-      <Box bg="white" p={{ base: 3, md: 4 }} rounded="md" shadow="sm" mb={6}>
-        <Flex direction={{ base: 'column', lg: 'row' }} gap={4} align="center">
-          <Input
-            placeholder="Buscar produtos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            focusBorderColor="brand.primary"
-            size="md"
-          />
-          <Select
-            placeholder="Filtrar por categoria"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            focusBorderColor="brand.primary"
-            size="md"
-          >
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </Select>
-          <Button
-            leftIcon={<RefreshCw size={16} />}
-            onClick={resetFilters}
-            variant="outline"
-            size="md"
-            fontSize="sm"
-            minW="140px"
-          >
-            Limpar filtros
-          </Button>
-        </Flex>
-      </Box>
+      <Flex direction={{ base: 'column', md: 'row' }} gap={4} mb={6}>
+        <Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} flexGrow={1}/>
+        <Select placeholder="Categoria" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} w={{ base: 'full', md: '200px' }}>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </Select>
+        <Button leftIcon={<RefreshCw/>} onClick={reset} w={{ base: 'full', md: 'auto' }}>Limpar</Button>
+      </Flex>
 
-      {loading ? (
-        <Center h="200px">
-          <Spinner size="xl" color="brand.primary" />
-        </Center>
+      {isMobile ? (
+        <Stack spacing={4}>
+          {filtered.map(p => (
+            <Box key={p.id} p={4} bg="white" shadow="sm" rounded="md">
+              <Flex justify="space-between" align="center" mb={2}>
+                <Text fontWeight="bold">{p.name}</Text>
+                <Menu>
+                  <MenuButton as={IconButton} icon={<MoreVertical/>} size="sm" variant="ghost" />
+                  <MenuList>
+                    <MenuItem icon={<RefreshCw/>} onClick={() => onAdjust(p)}>Ajustar</MenuItem>
+                    <MenuItem icon={<Edit/>} onClick={() => onEdit(p)}>Editar</MenuItem>
+                    <MenuItem icon={<Trash2/>} onClick={() => onDeleteClick(p)} color="red.500">Excluir</MenuItem>
+                  </MenuList>
+                </Menu>
+              </Flex>
+              <Text><strong>Categoria:</strong> {p.category}</Text>
+              <Text><strong>Qtd:</strong> {p.quantity} | <strong>Mín:</strong> {p.minQuantity}</Text>
+              <Text><strong>Caixas:</strong> {p.boxes} | <strong>Peso:</strong> {p.weightKg.toFixed(2)} kg</Text>
+              <Badge mt={2} colorScheme={p.quantity < p.minQuantity ? 'red' : 'green'}>
+                {p.quantity < p.minQuantity ? 'Comprar' : 'Em estoque'}
+              </Badge>
+            </Box>
+          ))}
+        </Stack>
       ) : (
-        <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto">
-          <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
+        <TableContainer>
+          <Table variant="simple">
             <Thead>
               <Tr>
                 <Th>Nome</Th>
-                <Th display={{ base: 'none', md: 'table-cell' }}>Categoria</Th>
+                <Th>Categoria</Th>
                 <Th isNumeric>Qtd.</Th>
-                <Th isNumeric display={{ base: 'none', sm: 'table-cell' }}>Mín.</Th>
+                <Th isNumeric>Mín.</Th>
                 <Th isNumeric>Caixas</Th>
                 <Th isNumeric>Peso (kg)</Th>
-                <Th>Status</Th> {}
+                <Th>Status</Th>
                 <Th>Ações</Th>
               </Tr>
             </Thead>
             <Tbody>
-              {filteredProducts.map((product) => (
-                <Tr key={product.id}>
-                  <Td>{product.name}</Td>
-                  <Td display={{ base: 'none', md: 'table-cell' }}>{product.category}</Td>
-                  <Td isNumeric>{product.quantity}</Td>
-                  <Td isNumeric display={{ base: 'none', sm: 'table-cell' }}>{product.minQuantity}</Td>
-                  <Td isNumeric>{product.boxes ?? 0}</Td>{/* Assuming product.weightKg is now reliably a number */}
-                  <Td isNumeric>{(product.weightKg ?? 0).toFixed(2)}</Td>
-                   <Td>
-                      {product.quantity < product.minQuantity ? (
-                        <Badge fontSize={{base: '2xs', md: 'xs'}} colorScheme="red">Comprar</Badge>
-                      ) : (
-                        <Badge fontSize={{base: '2xs', md: 'xs'}} colorScheme="green">Em estoque</Badge>
-                      )}
-                    </Td>
-                  <Td> 
-                    <Stack direction={{ base: 'column', lg: 'row' }} spacing={{base: 1, lg: 2}}>
-                      <IconButton
-                        aria-label="Ajustar estoque"
-                        icon={<RefreshCw size={16} />}
-                        size="sm"
-                        colorScheme="blue"
-                        onClick={() => handleStockAdjustment(product)}
-                      />
-                      <IconButton
-                        aria-label="Editar produto"
-                        icon={<Edit size={16} />}
-                        size="sm"
-                        colorScheme="green"
-                        onClick={() => handleEditProduct(product)}
-                      />
-                      <IconButton
-                        aria-label="Excluir produto"
-                        icon={<Trash2 size={16} />}
-                        size="sm"
-                        colorScheme="red"
-                        onClick={() => handleDeleteClick(product)}
-                      />
-                    </Stack>
+              {filtered.map(p => (
+                <Tr key={p.id}>
+                  <Td>{p.name}</Td>
+                  <Td>{p.category}</Td>
+                  <Td isNumeric>{p.quantity}</Td>
+                  <Td isNumeric>{p.minQuantity}</Td>
+                  <Td isNumeric>{p.boxes}</Td>
+                  <Td isNumeric>{p.weightKg.toFixed(2)}</Td>
+                  <Td><Badge colorScheme={p.quantity < p.minQuantity ? 'red' : 'green'}>{p.quantity < p.minQuantity ? 'Comprar' : 'Em estoque'}</Badge></Td>
+                  <Td>
+                    <Menu>
+                      <MenuButton as={IconButton} icon={<MoreVertical/>} size="sm" variant="ghost" />
+                      <MenuList>
+                        <MenuItem icon={<RefreshCw/>} onClick={() => onAdjust(p)}>Ajustar</MenuItem>
+                        <MenuItem icon={<Edit/>} onClick={() => onEdit(p)}>Editar</MenuItem>
+                        <MenuItem icon={<Trash2/>} onClick={() => onDeleteClick(p)} color="red.500">Excluir</MenuItem>
+                      </MenuList>
+                    </Menu>
                   </Td>
                 </Tr>
               ))}
@@ -327,45 +210,17 @@ const ProductsPage: React.FC = () => {
         </TableContainer>
       )}
 
-      {/* ProductModal now passes raw API data to onSave */}
-      <ProductModal
-        isOpen={isProductModalOpen}
-        onClose={onProductModalClose}
-        product={selectedProduct}
-        onSave={handleProductSaved} 
-        categories={categories}
-      />
+      <ProductModal isOpen={pModal.isOpen} onClose={pModal.onClose} product={selProd} onSave={onSaved} categories={categories} />
+      <StockAdjustmentModal isOpen={sModal.isOpen} onClose={sModal.onClose} product={adjProd} onAdjust={onAdjusted} />
 
-      {/* StockAdjustmentModal now passes raw API data to onAdjust */}
-      <StockAdjustmentModal
-        isOpen={isStockAdjustmentOpen}
-        onClose={onStockAdjustmentClose}
-        product={productForStockAdjustment}
-        onAdjust={handleStockAdjusted}
-      />
-
-      <AlertDialog
-        isOpen={isDeleteDialogOpen}
-        leastDestructiveRef={cancelRef}
-        onClose={onDeleteDialogClose}
-      >
+      <AlertDialog isOpen={dModal.isOpen} leastDestructiveRef={cancelRef} onClose={dModal.onClose}>
         <AlertDialogOverlay>
           <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Excluir produto
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              Tem certeza que deseja excluir o produto "{productToDelete?.name}"? Esta ação não pode ser desfeita.
-            </AlertDialogBody>
-
+            <AlertDialogHeader>Excluir produto</AlertDialogHeader>
+            <AlertDialogBody>Tem certeza que deseja excluir "{toDelete?.name}"?</AlertDialogBody>
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onDeleteDialogClose}>
-                Cancelar
-              </Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3}>
-                Excluir
-              </Button>
+              <Button ref={cancelRef} onClick={dModal.onClose}>Cancelar</Button>
+              <Button colorScheme="red" onClick={onDelete} ml={3}>Excluir</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>
