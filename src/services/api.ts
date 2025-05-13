@@ -2,8 +2,7 @@ console.log('🛠️ VITE_API_URL =', import.meta.env.VITE_API_URL);
 import axios from 'axios';
 
 // Base URL - Change this to your actual backend URL
-const baseURL = import.meta.env.VITE_API_URL || 'https://organicosdafatimaestoque.site/api/auth/login';
-
+const baseURL = import.meta.env.VITE_API_URL;
 const api = axios.create({
   baseURL,
   headers: {
