@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Box, Flex, Icon, Text, VStack, HStack, Divider, Image } from '@chakra-ui/react';
-import { Home, Package, ShoppingBag, Users, Leaf } from 'lucide-react';
+// Adicione o ícone para Sementes, por exemplo, Sprout
+import { Home, Package, ShoppingBag, Users, Leaf, Sprout } from 'lucide-react'; 
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavItemProps {
@@ -12,7 +13,8 @@ interface NavItemProps {
 
 const NavItem = ({ icon, to, children }: NavItemProps) => {
   const location = useLocation();
-  const isActive = location.pathname === to;
+  const isActive = location.pathname === to || (to === '/dashboard' && location.pathname === '/');
+
 
   return (
     <NavLink to={to} style={{ width: '100%' }}>
@@ -43,10 +45,12 @@ const Sidebar = () => {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <Box h="full" bg="white">
-      <Flex h="20" alignItems="center" justifyContent="center">
+    <Box h="full" bg="white" borderRight="1px" borderColor="gray.200">
+      <Flex h="20" alignItems="center" justifyContent="center" >
         <Flex alignItems="center">
-          <Icon as={Leaf} w={6} h={6} color="brand.primary" mr={2} />
+          {/* Você pode usar uma imagem de logo aqui se tiver */}
+          {/* <Image src="/path/to/your/logo.png" alt="Logo" boxSize="40px" mr={2} /> */}
+          <Icon as={Leaf} w={8} h={8} color="brand.primary" mr={2} />
           <Text fontSize="xl" fontWeight="bold" color="brand.primary">
             Orgânicos da Fátima
           </Text>
@@ -63,6 +67,10 @@ const Sidebar = () => {
         <NavItem icon={<ShoppingBag size={20} />} to="/materials">
           Materiais
         </NavItem>
+        {/* Adicionando o NavItem para Sementes */}
+        <NavItem icon={<Sprout size={20} />} to="/seeds">
+          Sementes
+        </NavItem>
         {isAdmin && (
           <NavItem icon={<Users size={20} />} to="/users">
             Usuários
@@ -72,7 +80,7 @@ const Sidebar = () => {
       <Box position="absolute" bottom="0" w="full" p={4}>
         <Divider mb={4} />
         <Text fontSize="xs" color="gray.500" textAlign="center">
-          © 2025 Orgânicos da Fátima
+          © {new Date().getFullYear()} Orgânicos da Fátima
         </Text>
       </Box>
     </Box>

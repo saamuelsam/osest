@@ -12,6 +12,7 @@ import authRoutes from './src/routes/authRoutes.js';
 import userRoutes from './src/routes/userRoutes.js'; // ✅ correção aqui!
 import productRoutes from './src/routes/productRoutes.js';
 import materialRoutes from './src/routes/materialRoutes.js';
+import seedRoutes from './src/routes/seedRoutes.js';
 import { notFound, errorHandler } from './src/middleware/errorMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +32,7 @@ app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/materials', materialRoutes);
+app.use('/api/seeds', seedRoutes);
 
 // Front-end
 if (process.env.NODE_ENV === 'production') {

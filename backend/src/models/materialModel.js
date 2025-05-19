@@ -1,4 +1,5 @@
 import { query } from '../database/db.js';
+import { v4 as uuidv4 } from 'uuid';
 
 // Get all materials
 export const getAllMaterials = async () => {
@@ -8,8 +9,8 @@ export const getAllMaterials = async () => {
       name, 
       quantity, 
       min_quantity as minQuantity,
-      boxes,                 -- Adicionado
-      weight_kg as weightKg, -- Adicionado e alias para camelCase
+      boxes,
+      weight_kg as weightKg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM materials
@@ -26,8 +27,8 @@ export const getMaterialById = async (id) => {
       name, 
       quantity, 
       min_quantity as minQuantity,
-      boxes,                 -- Adicionado
-      weight_kg as weightKg, -- Adicionado e alias para camelCase
+      boxes,
+      weight_kg as weightKg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM materials
@@ -38,29 +39,31 @@ export const getMaterialById = async (id) => {
 
 // Create a new material
 export const createMaterial = async (materialData) => {
-  // Assume que materialData pode vir com weightKg (camelCase) do controller/frontend
-  // e precisamos de weight_kg (snake_case) para o banco.
-  // Se o frontend já envia weight_kg, essa transformação não é estritamente necessária aqui,
-  // mas é uma boa prática garantir o formato correto para o banco.
   const { name, quantity, minQuantity, boxes, weightKg } = materialData;
-  
+  const id = uuidv4(); // Gere o UUID aqui
+
   const params = [
+    id, // Inclua o ID gerado nos parâmetros
     name,
     quantity,
     minQuantity,
-    boxes === undefined ? null : boxes,          // Converte undefined para null
-    weightKg === undefined ? null : weightKg     // Converte undefined para null
+    boxes === undefined ? null : boxes,
+    weightKg === undefined ? null : weightKg
   ];
 
+  // Adicione a coluna 'id' à sua instrução INSERT
   const result = await query(
-    'INSERT INTO materials (name, quantity, min_quantity, boxes, weight_kg) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO materials (id, name, quantity, min_quantity, boxes, weight_kg) VALUES (?, ?, ?, ?, ?, ?)',
     params
   );
   
   if (result.affectedRows === 1) {
-    return await getMaterialById(result.insertId);
+    // Use o 'id' que você gerou para buscar o material recém-criado
+    return await getMaterialById(id); 
   }
   
+  // Se a inserção falhar por algum motivo (affectedRows não é 1)
+  console.error('Falha ao inserir material no banco de dados. Result:', result);
   return null;
 };
 
@@ -72,8 +75,8 @@ export const updateMaterial = async (id, materialData) => {
     name,
     quantity,
     minQuantity,
-    boxes === undefined ? null : boxes,        // Converte undefined para null
-    weightKg === undefined ? null : weightKg,  // Converte undefined para null
+    boxes === undefined ? null : boxes,
+    weightKg === undefined ? null : weightKg,
     id
   ];
   
@@ -92,20 +95,16 @@ export const deleteMaterial = async (id) => {
 };
 
 // Adjust material quantity (mostly for adding new inventory)
-// Esta função não mexe diretamente com boxes ou weight_kg, mas getMaterialById retornará os campos atualizados.
 export const adjustMaterialQuantity = async (id, quantity, userId) => {
-  // Get current material
   const material = await getMaterialById(id);
   if (!material) return null;
   
-  // Update material quantity
   const newQuantity = material.quantity + quantity;
   await query(
     'UPDATE materials SET quantity = ? WHERE id = ?',
     [newQuantity, id]
   );
   
-  // Log the movement
   await query(
     'INSERT INTO stock_movements (material_id, quantity, type, description, created_by) VALUES (?, ?, ?, ?, ?)',
     [id, quantity, 'add', 'Entrada de estoque', userId]
@@ -115,25 +114,20 @@ export const adjustMaterialQuantity = async (id, quantity, userId) => {
 };
 
 // Record material usage
-// Esta função não mexe diretamente com boxes ou weight_kg, mas getMaterialById retornará os campos atualizados.
 export const useMaterial = async (id, quantity, description, userId) => {
-  // Get current material
   const material = await getMaterialById(id);
   if (!material) return null;
   
-  // Check if there's enough quantity
   if (material.quantity < quantity) {
     throw new Error('Quantidade insuficiente');
   }
   
-  // Update material quantity
   const newQuantity = material.quantity - quantity;
   await query(
     'UPDATE materials SET quantity = ? WHERE id = ?',
     [newQuantity, id]
   );
   
-  // Log the movement
   await query(
     'INSERT INTO stock_movements (material_id, quantity, type, description, created_by) VALUES (?, ?, ?, ?, ?)',
     [id, quantity, 'remove', description || 'Uso interno', userId]
@@ -150,8 +144,8 @@ export const getLowStockMaterials = async () => {
       name, 
       quantity, 
       min_quantity as minQuantity,
-      boxes,                 -- Adicionado
-      weight_kg as weightKg, -- Adicionado e alias para camelCase
+      boxes,
+      weight_kg as weightKg,
       created_at as createdAt, 
       updated_at as updatedAt 
     FROM materials
@@ -162,7 +156,6 @@ export const getLowStockMaterials = async () => {
 };
 
 // Get material movement history
-// Esta função não lida diretamente com os campos boxes/weight_kg da tabela materials.
 export const getMaterialMovements = async (materialId) => {
   const rows = await query(`
     SELECT 

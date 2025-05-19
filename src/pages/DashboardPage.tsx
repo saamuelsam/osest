@@ -30,7 +30,7 @@ const DashboardPage = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchData = async () => {
       try {
         const [productsRes, materialsRes] = await Promise.all([
@@ -38,10 +38,26 @@ const DashboardPage = () => {
           api.get('/materials'),
         ]);
         
-        setProducts(productsRes.data);
-        setMaterials(materialsRes.data);
+        // Ensure that productsRes.data is an array before setting state
+        if (Array.isArray(productsRes?.data)) {
+          setProducts(productsRes.data);
+        } else {
+          console.warn('API response for products was not an array:', productsRes?.data);
+          setProducts([]); // Default to an empty array if not an array
+        }
+        
+        // Ensure that materialsRes.data is an array before setting state
+        if (Array.isArray(materialsRes?.data)) {
+          setMaterials(materialsRes.data);
+        } else {
+          console.warn('API response for materials was not an array:', materialsRes?.data);
+          setMaterials([]); // Default to an empty array if not an array
+        }
+
       } catch (error) {
         console.error('Erro ao carregar dados do dashboard:', error);
+        setProducts([]); // Set to empty array on error to prevent further issues
+        setMaterials([]); // Set to empty array on error
       } finally {
         setLoading(false);
       }

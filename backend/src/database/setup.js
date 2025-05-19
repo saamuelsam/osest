@@ -90,6 +90,22 @@ const createDatabase = async () => {
         ) ENGINE=InnoDB;
       `); // REMOVIDO O COMENTÁRIO DAQUI
       console.log('Tabela "materials" criada ou já existente.');
+
+      // Create seeds table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS seeds (
+        id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        name VARCHAR(100) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        package_100 INT NOT NULL DEFAULT 0,
+        package_200 INT NOT NULL DEFAULT 0,
+        package_500 INT NOT NULL DEFAULT 0,
+        min_quantity INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Seeds table created or already exists');
   
       await connection.query(`
         CREATE TABLE IF NOT EXISTS stock_movements (
@@ -154,6 +170,19 @@ const createDatabase = async () => {
         console.log('Materiais de exemplo criados.');
       }
   
+      // Create sample seeds if table is empty
+    const [seedRows] = await connection.query('SELECT * FROM seeds LIMIT 1');
+    if (seedRows.length === 0) {
+      await connection.query(`
+        INSERT INTO seeds (name, type, package_100, package_200, package_500, min_quantity) VALUES
+        ('Alface Crespa', 'Folhosas', 50, 30, 20, 10),
+        ('Rúcula', 'Folhosas', 40, 25, 15, 8),
+        ('Cenoura', 'Raízes', 30, 20, 10, 5),
+        ('Tomate Cereja', 'Frutos', 35, 25, 15, 8),
+        ('Coentro', 'Temperos', 45, 30, 20, 10)
+      `);
+      console.log('Sample seeds created');
+    }
   
       console.log('Configuração do banco de dados concluída com sucesso!');
     } catch (error) {

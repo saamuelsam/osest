@@ -10,6 +10,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfilePage from './pages/ProfilePage';
+import SeedsPage from './pages/SeedsPage';
 
 function App() {
   const { isAuthenticated, loading, checkAuth } = useAuth();
@@ -34,6 +35,8 @@ function App() {
           <Route path="/users" element={<UsersPage />} />
           {/* Adicione as novas rotas aqui */}
           <Route path="/perfil" element={<ProfilePage />} />
+          <Route path="/seeds" element={<SeedsPage />} />
+          {/* Adicione outras rotas conforme necessário */}
         </Route>
       </Route>
       

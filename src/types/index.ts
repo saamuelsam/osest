@@ -28,6 +28,19 @@ export interface Material {
   weightKg?: number;
 }
 
+
+export interface Seed {
+  id: string;
+  name: string;
+  type: string;
+  package100: number;
+  package200: number;
+  package500: number;
+  minQuantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductFormData {
   name: string;
   category: string;
@@ -54,6 +67,14 @@ export interface UserFormData {
 
 export interface StockAdjustment {
   quantity: number;
+  type: 'add' | 'remove';
+  description?: string;
+}
+
+export interface SeedAdjustment {
+  package100: number;
+  package200: number;
+  package500: number;
   type: 'add' | 'remove';
   description?: string;
 }
