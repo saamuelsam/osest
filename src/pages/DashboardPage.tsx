@@ -20,44 +20,33 @@ import {
   Center,
   Icon,
 } from '@chakra-ui/react';
-import { Package, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { Package, ShoppingBag, AlertTriangle, Leaf } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Product, Material } from '../types';
+import { Product, Material, Seed } from '../types';
 
 const DashboardPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [seeds, setSeeds] = useState<Seed[]>([]);
   const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsRes, materialsRes] = await Promise.all([
+        const [productsRes, materialsRes, seedsRes] = await Promise.all([
           api.get('/products'),
           api.get('/materials'),
+          api.get('/seeds'),
         ]);
-        
-        // Ensure that productsRes.data is an array before setting state
-        if (Array.isArray(productsRes?.data)) {
-          setProducts(productsRes.data);
-        } else {
-          console.warn('API response for products was not an array:', productsRes?.data);
-          setProducts([]); // Default to an empty array if not an array
-        }
-        
-        // Ensure that materialsRes.data is an array before setting state
-        if (Array.isArray(materialsRes?.data)) {
-          setMaterials(materialsRes.data);
-        } else {
-          console.warn('API response for materials was not an array:', materialsRes?.data);
-          setMaterials([]); // Default to an empty array if not an array
-        }
-
+        setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
+        setMaterials(Array.isArray(materialsRes.data) ? materialsRes.data : []);
+        setSeeds(Array.isArray(seedsRes.data) ? seedsRes.data : []);
       } catch (error) {
         console.error('Erro ao carregar dados do dashboard:', error);
-        setProducts([]); // Set to empty array on error to prevent further issues
-        setMaterials([]); // Set to empty array on error
+        setProducts([]);
+        setMaterials([]);
+        setSeeds([]);
       } finally {
         setLoading(false);
       }
@@ -66,11 +55,22 @@ const DashboardPage = () => {
     fetchData();
   }, []);
 
+  // Filtros
   const lowStockProducts = products.filter(product => product.quantity < product.minQuantity);
   const lowStockMaterials = materials.filter(material => material.quantity < material.minQuantity);
 
+  // Totais
   const totalProducts = products.length;
   const totalMaterials = materials.length;
+  // Somar todos os pacotes de todas as sementes
+  const totalSeeds = seeds.reduce(
+    (sum, s) =>
+      sum +
+      (Number(s.package100 || s.package100 || 0) +
+        Number(s.package200 || s.package200 || 0) +
+        Number(s.package500 || s.package500 || 0)),
+    0
+  );
   const totalLowStock = lowStockProducts.length + lowStockMaterials.length;
 
   if (loading) {
@@ -82,12 +82,12 @@ const DashboardPage = () => {
   }
 
   return (
-    <Box p={{ base: 4, md: 6 }} overflowX="hidden"> {/* Add overflowX hidden to the main container as a safeguard if needed, but ideally fix the child */}
+    <Box p={{ base: 4, md: 6 }} overflowX="hidden">
       <Heading size={{ base: 'lg', md: 'xl' }} mb={{ base: 4, md: 6 }}>
         Dashboard
       </Heading>
       
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 4, md: 6 }} mb={{ base: 6, md: 8 }}>
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={{ base: 4, md: 6 }} mb={{ base: 6, md: 8 }}>
         <StatCard
           title="Total de Produtos"
           value={totalProducts}
@@ -99,6 +99,12 @@ const DashboardPage = () => {
           value={totalMaterials}
           icon={<ShoppingBag size={24} />}
           accentColor="brand.accent"
+        />
+        <StatCard
+          title="Total de Sementes"
+          value={totalSeeds}
+          icon={<Leaf size={24} />} // Ícone de folha para representar sementes!
+          accentColor="green.500"
         />
         <StatCard
           title="Itens em Baixo Estoque"
@@ -121,12 +127,10 @@ const DashboardPage = () => {
                 <Icon as={Package} mr={2} color="brand.primary" />
                 <Text fontWeight="medium" fontSize={{ base: 'md', md: 'lg' }}>Produtos</Text>
               </Flex>
-              {/* Ensure TableContainer can scroll its content and doesn't grow indefinitely */}
               <TableContainer bg="white" rounded="md" shadow="sm" overflowX="auto" maxW="100%">
                 <Table variant="simple" size={{ base: 'sm', md: 'md' }}>
                   <Thead>
                     <Tr>
-                      {/* Apply whiteSpace normal to allow wrapping if needed, though Th usually handles this */}
                       <Th whiteSpace="normal">Nome</Th>
                       <Th display={{ base: 'none', sm: 'table-cell' }} whiteSpace="normal">Categoria</Th>
                       <Th isNumeric>Atual</Th>
@@ -137,7 +141,6 @@ const DashboardPage = () => {
                   <Tbody>
                     {lowStockProducts.map((product) => (
                       <Tr key={product.id}>
-                        {/* For long text in cells, ensure it can break */}
                         <Td fontWeight="medium" whiteSpace="normal" wordBreak="break-word">{product.name}</Td>
                         <Td display={{ base: 'none', sm: 'table-cell' }} whiteSpace="normal" wordBreak="break-word">{product.category}</Td>
                         <Td isNumeric>{product.quantity}</Td>
@@ -195,7 +198,7 @@ const DashboardPage = () => {
   );
 };
 
-// ... StatCard component remains the same ...
+// Componente de estatística
 interface StatCardProps {
   title: string;
   value: number;
@@ -207,8 +210,8 @@ interface StatCardProps {
 const StatCard = ({ title, value, helpText, icon, accentColor }: StatCardProps) => {
   return (
     <Stat
-      px={{ base: 3, md: 4 }} // Padding responsivo
-      py={{ base: 4, md: 5 }} // Padding responsivo
+      px={{ base: 3, md: 4 }}
+      py={{ base: 4, md: 5 }}
       bg="white"
       rounded="lg"
       shadow="sm"
@@ -232,11 +235,11 @@ const StatCard = ({ title, value, helpText, icon, accentColor }: StatCardProps) 
           )}
         </Box>
         <Box
-          p={{ base: 1, md: 2 }} // Padding responsivo
+          p={{ base: 1, md: 2 }}
           bg={accentColor}
           color="white"
           rounded="md"
-          alignSelf="flex-start" 
+          alignSelf="flex-start"
         >
           {icon}
         </Box>
